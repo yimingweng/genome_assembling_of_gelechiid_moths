@@ -225,7 +225,7 @@ text(highest[,1], highest[,2], highest$V1,
 
 <br />
 
-## **08/231/2022**  
+## **08/31/2022**  
 **\# PacBio read handling**  
 **\# genome assembly**  
 
@@ -372,7 +372,7 @@ The result of K=27 can be found [here](http://qb.cshl.edu/genomescope/genomescop
 ![](http://qb.cshl.edu/genomescope/genomescope2.0/user_data/3w5G4b8elEYO96CcJdTX/linear_plot.png)
 ![](http://qb.cshl.edu/genomescope/genomescope2.0/user_data/3w5G4b8elEYO96CcJdTX/transformed_linear_plot.png)
 
-5. Assemble the genome with hifisam
+8. Assemble the genome with hifisam
 ```
 [yimingweng@login6 assemblies]$ pwd
 /blue/kawahara/yimingweng/Kely_genome_project/assemblies
@@ -404,4 +404,387 @@ hifiasm -o /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam
 # convert the output file to fasta
 awk '/^S/{print ">"$2;print $3}' /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam.asm.bp.p_ctg.gfa > /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam_default.fasta
 ########################################################################
+```
+<span style="color:red">NOTE: the output files of KMC are pretty large, so delete them and just keep the histogram files. </span>
+
+<br />
+
+## **09/01/2022**  
+**\# BUSCO**  
+**\# purge_haplotigs pipeline**  
+**\# blobplot**  
+
+The genome assembly is done and let's look at the assembly statistics.
+
+1. Use the previously developed python script "`assemblystats.py`" to get the assembly statistics.
+```
+[yimingweng@login5 kely_hifisam_default]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default
+
+# allow the script to be excuted
+[yimingweng@login5 kely_hifisam_default]$ chmod +x assemblystats.py
+
+# run the script with the input of the assembly
+./assemblystats.py Kely_hifisam.asm.bp.p_ctg.gfa Kely_hifisam_default_stats
+
+# keep  the script for future reference and use
+[yimingweng@login5 kely_hifisam_default]$ cp ./assemblystats.py /blue/kawahara/yimingweng/scripts/
+
+#
+[yimingweng@login5 kely_hifisam_default]$ cat Kely_hifisam_default_stats
+{
+  "Contig Stats": {
+    "L10": 1,
+    "L20": 3,
+    "L30": 6,
+    "L40": 8,
+    "L50": 12,
+    "N10": 24805861,
+    "N20": 22264078,
+    "N30": 16479331,
+    "N40": 15732994,
+    "N50": 14121271,
+    "gc_content": 38.88312173637028,
+    "longest": 29025318,
+    "mean": 3928602.3017241377,
+    "median": 460798.0,
+    "sequence_count": 116,
+    "shortest": 6552,
+    "total_bps": 455717867
+  },
+  "Scaffold Stats": {
+    "L10": 1,
+    "L20": 3,
+    "L30": 6,
+    "L40": 8,
+    "L50": 12,
+    "N10": 24805861,
+    "N20": 22264078,
+    "N30": 16479331,
+    "N40": 15732994,
+    "N50": 14121271,
+    "gc_content": 38.88312173637028,
+    "longest": 29025318,
+    "mean": 3928602.3017241377,
+    "median": 460798.0,
+    "sequence_count": 116,
+    "shortest": 6552,
+    "total_bps": 455717867
+  }
+}
+
+###########################  script content  ###########################
+#!/usr/bin/env python
+
+import numpy as np
+from itertools import groupby
+import json
+import sys
+
+
+def fasta_iter(fasta_file):
+    """Takes a FASTA file, and produces a generator of Header and Sequences.
+    This is a memory-efficient way of analyzing a FASTA files -- without
+    reading the entire file into memory.
+
+    Parameters
+    ----------
+    fasta_file : str
+        The file location of the FASTA file
+
+    Returns
+    -------
+    header: str
+        The string contained in the header portion of the sequence record
+        (everything after the '>')
+    seq: str
+        The sequence portion of the sequence record
+    """
+
+    fh = open(fasta_file)
+    fa_iter = (x[1] for x in groupby(fh, lambda line: line[0] == ">"))
+    for header in fa_iter:
+        # drop the ">"
+        header = next(header)[1:].strip()
+        # join all sequence lines to one.
+        seq = "".join(s.upper().strip() for s in next(fa_iter))
+        yield header, seq
+
+
+def read_genome(fasta_file):
+    """Takes a FASTA file, and produces 2 lists of sequence lengths. It also
+    calculates the GC Content, since this is the only statistic that is not
+    calculated based on sequence lengths.
+
+    Parameters
+    ----------
+    fasta_file : str
+        The file location of the FASTA file
+
+    Returns
+    -------
+    contig_lens: list
+        A list of lengths of all contigs in the genome.
+    scaffold_lens: list
+        A list of lengths of all scaffolds in the genome.
+    gc_cont: float
+        The percentage of total basepairs in the genome that are either G or C.
+    """
+
+    gc = 0
+    total_len = 0
+    contig_lens = []
+    scaffold_lens = []
+    for _, seq in fasta_iter(fasta_file):
+        scaffold_lens.append(len(seq))
+        if "NN" in seq:
+            contig_list = seq.split("NN")
+        else:
+            contig_list = [seq]
+        for contig in contig_list:
+            if len(contig):
+                gc += contig.count('G') + contig.count('C')
+                total_len += len(contig)
+                contig_lens.append(len(contig))
+    gc_cont = (gc / total_len) * 100
+    return contig_lens, scaffold_lens, gc_cont
+
+
+def calculate_stats(seq_lens, gc_cont):
+    stats = {}
+    seq_array = np.array(seq_lens)
+    stats['sequence_count'] = seq_array.size
+    stats['gc_content'] = gc_cont
+    sorted_lens = seq_array[np.argsort(-seq_array)]
+    stats['longest'] = int(sorted_lens[0])
+    stats['shortest'] = int(sorted_lens[-1])
+    stats['median'] = np.median(sorted_lens)
+    stats['mean'] = np.mean(sorted_lens)
+    stats['total_bps'] = int(np.sum(sorted_lens))
+    csum = np.cumsum(sorted_lens)
+    for level in [10, 20, 30, 40, 50]:
+        nx = int(stats['total_bps'] * (level / 100))
+        csumn = min(csum[csum >= nx])
+        l_level = int(np.where(csum == csumn)[0])
+        n_level = int(sorted_lens[l_level])
+
+        stats['L' + str(level)] = l_level
+        stats['N' + str(level)] = n_level
+    return stats
+
+
+if __name__ == "__main__":
+    infilename = sys.argv[1]
+    contig_lens, scaffold_lens, gc_cont = read_genome(infilename)
+    contig_stats = calculate_stats(contig_lens, gc_cont)
+    scaffold_stats = calculate_stats(scaffold_lens, gc_cont)
+    stat_output = {'Contig Stats': contig_stats,
+                   'Scaffold Stats': scaffold_stats}
+    print(json.dumps(stat_output, indent=2, sort_keys=True))
+########################################################################
+```
+2. The result looks pretty good. It has **116 contigs** with N50 of **14,121,271 bps**. I have a little concern about the assembled size which is about **455 Mbps**, larger than the estimate by GenomeScope (318 Mbp). This could be owing to the presense of duplication regions (the third peak in the kmer count distribution)? Maybe BUSCO can help clarify the situation. If the duplication rate is high, maybe I should try to run the purge haplotig pipeline.
+- run busco for this genome
+```
+[yimingweng@login5 kely_hifisam_default]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default
+
+# copy the Augustus contig folder to here
+[yimingweng@login5 kely_hifisam_default]$ cp -r /blue/kawahara/yimingweng/LepidoPhylo_Project/busco_out/Augustus/ ./
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=Kely_busco
+#SBATCH -o Kely_busco.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 3:00:00
+#SBATCH -c 12
+
+# define configure file for BUSCO and augustus
+# For augustus, if encounter an authorization issue (error pops up when running busco), try to download the augustus repo and use its config dir
+export BUSCO_CONFIG_FILE="blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/config.ini"
+export AUGUSTUS_CONFIG_PATH="/blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/Augustus/config/"
+
+# load busco, make sure this is the latest version
+module load busco/5.3.0
+
+# run busco command
+busco -f -i /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam_default.fasta \
+ -o ./busco_out \
+ -l /data/reference/busco/v5/lineages/endopterygota_odb10 \
+ -m genome -c 6 --augustus
+########################################################################
+
+# check the results
+[yimingweng@login2 busco_out]$ cat short_summary.specific.endopterygota_odb10.busco_out.
+cat: short_summary.specific.endopterygota_odb10.busco_out.: No such file or directory
+        C:98.1%[S:95.8%,D:2.3%],F:0.5%,M:1.4%,n:2124
+        2082    Complete BUSCOs (C)
+        2034    Complete and single-copy BUSCOs (S)
+        48      Complete and duplicated BUSCOs (D)
+        10      Fragmented BUSCOs (F)
+        32      Missing BUSCOs (M)
+        2124    Total BUSCO groups searched
+```
+3. The result of busco looks good, it has the completeness (C) of **98.1%** but like it is expected, the duplication rate is a bit high (it's **2.3%** and usually I see duplucation rate between 0.5%-2%). So let's go over the [purge_haplotigs pipeline](https://bitbucket.org/mroachawri/purge_haplotigs/src/master/). There are several steps in this pipeline, let's do it step by step.
+-  step 1: map the raw reads (subreads) to the target genome assembly.
+
+```
+[yimingweng@login2 kely_hifisam_default]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default
+
+# prepare the input files
+[yimingweng@login2 kely_hifisam_default]$ gzip -c Kely_hifisam_default.fasta > Kely_hifisam_default.fasta.gz
+```
+
+
+```
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=Kely_minimap
+#SBATCH -o Kely_minimap.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=8gb
+#SBATCH -t 3:00:00
+#SBATCH -c 4
+
+module load minimap/2.21
+module load samtools/1.15
+module load purge_haplotigs/1.1.2
+module load libssl/1.0.2l
+
+minimap2 -t 4 -ax map-pb /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam_default.fasta \
+/blue/kawahara/yimingweng/Kely_genome_project/raw_reads/Keiferia_lycopersicella_ccs.fastq.gz \
+--secondary=no \
+| samtools sort -m 1G -o aligned.bam -T tmp.ali
+
+purge_haplotigs  hist  \
+-b /blue/kawahara/yimingweng/Kely_genome_project/purging/aligned.bam  \
+-g /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam_default.fasta  
+########################################################################
+```
+- step 2: determine the cutoffs of coverage for the contigs based on the coverage histogram. The cutoffs I would like to apply is min=5 and max=120. I will use this values to purge the contigs.
+<img src="https://github.com/yimingweng/Kely_genome_project/blob/main/kmer_plots/aligned.bam.histogram.png?raw=true?">
+```
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=purge_cutoff
+#SBATCH -o purge_cutoff.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=2gb
+#SBATCH -t 1:00:00
+#SBATCH -c 4
+
+module load samtools/1.15
+module load purge_haplotigs/1.1.2
+module load libssl/1.0.2l
+
+purge_haplotigs cov \
+-i /blue/kawahara/yimingweng/Kely_genome_project/purging/aligned.bam.gencov  \
+-l 5  \
+-m 33  \
+-h 120  \
+-o coverage_stats.csv \
+-j 80 \
+-s 80
+########################################################################
+```
+
+- step 3: Run the purging pipeline.
+
+```
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=Kely_purge_haplotigs
+#SBATCH -o Kely_purge_haplotigs.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=8gb
+#SBATCH -t 3:00:00
+#SBATCH -c 4
+
+module load minimap/2.21
+module load bedtools/2.30.0
+module load samtools/1.15
+module load purge_haplotigs/1.1.2
+module load libssl/1.0.2l
+
+purge_haplotigs purge  \
+-g /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam_default.fasta  \
+-c /blue/kawahara/yimingweng/Kely_genome_project/purging/coverage_stats.csv \
+-o Kely_purge_15X_120X
+########################################################################
+```
+
+- The resulting genome assembly has only **62 contigs** (originally it has 116 contigs), but the assembled size doesn't reduce much (**455 Mbps >> 444 Mbps**). It seems that it has removed most of the smallest contigs even though the cutoffs were not about size but coverages.
+
+4. Rerun BUSCO on the purged genome.
+```
+[yimingweng@login6 Kely_purge_15X_120X]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/busco/Kely_purge_15X_120X
+
+sbatch universal_run_busco.slurm /blue/kawahara/yimingweng/Kely_genome_project/purging/Kely_purge_15X_120X.fasta Kely_purge_15X_120X
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=universal_run_busco
+#SBATCH -o universal_run_busco.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 3:00:00
+#SBATCH -c 12
+
+fasta=${1} # the full path of genome fasta file
+outprefix=${2} # the name desired to be for the putput
+
+# copy the contig files from `/blue/kawahara/yimingweng/LepidoPhylo_Project/busco_out/`
+cp -r /blue/kawahara/yimingweng/LepidoPhylo_Project/busco_out/Augustus ./
+cp -r /blue/kawahara/yimingweng/LepidoPhylo_Project/busco_out/config.ini ./
+
+export BUSCO_CONFIG_FILE="blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/config.ini"
+export AUGUSTUS_CONFIG_PATH="/blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/Augustus/config/"
+
+# load busco, make sure this is the latest version
+module load busco/5.3.0
+
+mkdir ${outprefix}
+
+# run busco command
+busco -f -i ${fasta} \
+ -o ./${outprefix} \
+ -l /data/reference/busco/v5/lineages/endopterygota_odb10 \
+ -m genome -c 6 --augustus
+
+rm -rf Augustus config.ini
+########################################################################
+```
+- The result shows that the genome has certain improvement. Now the BUSCO is:
+BUSCO: C:98.0%[S:96.9%,D:1.1%],F:0.5%,M:1.5%,n:2124. However, it will be better to further look at the GC content to identify the non-target sequences. So let's do blobplot.
+
+
+5. Using [blobplot](https://blobtools.readme.io/docs) to identify the non-target sequences in the genome assembly. See the instruction [here](https://blobtools.readme.io/docs/my-first-blobplot) to do the work.
+- create the database (blastdb) for [hits](https://blobtools.readme.io/docs/taxonomy-file) file, one of the requred input to make blobplot.
+```
+[yimingweng@login2 blastdb]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/blobplot/blastdb
+
+# download the perl script (update_blastdb.pl) from NCBI
+# make it excusible
+[yimingweng@login2 blastdb]$ chmod +x  update_blastdb.pl
+
+# to make it work, make sure you load the perl module
+module load perl/5.24.1
+
+# test this perl script
+./update_blastdb.pl --help
 ```
