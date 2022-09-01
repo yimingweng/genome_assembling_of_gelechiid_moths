@@ -163,8 +163,8 @@ Stage 2: 92%
 - Generate the histo file for plotting the result generated from KMC with the customized bash script **kmc2histo.sh**
 ```
 bash kmc2histo.sh 21mers.txt plin_test
-# the 21mers.txt is the input argument1, which should be the output from KMC
 
+# the 21mers.txt is the input argument1, which should be the output from KMC
 #####################  script content  ####################
 #!/bin/bash
 # This script is to manage the output from KMC and create the histogram that can be easily visualized through R or other programs
@@ -186,6 +186,7 @@ do
    echo -e "${i}\t${count}" >> ${out}.histo
 done
 rm *tmp
+###########################################################
 ```
 - Transfer the histo file to the local machine, so that I can use R to visualize the result
 ```
@@ -194,7 +195,7 @@ scp -P 22 yimingweng@hpg.rc.ufl.edu:/home/yimingweng/plin.histo ./
 ```
 
 
-- plot the histogram using R script **kmer_plot.r**
+- Plot the histogram using my R script **kmer_plot.r**
 ```
 ######## R environment ########
 path <- getwd()
@@ -217,4 +218,190 @@ plot(myhisto[10:200,],
 points(myhisto[10:200,]) # plot the data points
 text(highest[,1], highest[,2], highest$V1,
      cex=1, pos=2,col="black")
+```
+
+- Here is this plot:
+<img src="https://github.com/yimingweng/Kely_genome_project/blob/main/kmer_plots/plin_kmer_density_plot.jpg?raw=true?raw=true">
+
+<br />
+
+## **08/231/2022**  
+**\# PacBio read handling**  
+**\# genome assembly**  
+
+The first genome sequence reads are now available. So let's play with this giant package (2.1T).
+1. Under the path I desired to store the reads (usually in `orange/`), run the command provided by the sequencing company or UF-ICBR
+```
+[yimingweng@login5 2_B03]$ pwd
+/orange/kawahara/yimingweng/raw_read_storage/NS2846/2_B03
+# run the command provided by the sequencing facility
+# this takes hours to finish, so make sure the ssh can stay linked for this long period of time to allow the data transition finish
+/orange/icbrdd/receive NS2846 
+
+# when the data transition is done, a folder shows up and there are lots of bam files in there
+# the one with extension of "subreads.bam" is the one with clean reads 
+[yimingweng@login5 2_B03]$ ls
+hifi_reads				                       m64219e_220809_225049.subreadset.xml
+m64219e_220809_225049.baz2bam_1.log         m64219e_220809_225049.subreadset.xml.bak
+m64219e_220809_225049.scraps.bam	           m64219e_220809_225049.transferdone
+m64219e_220809_225049.scraps.bam.pbi	     subreadsTohifi-2.sh
+m64219e_220809_225049.sts.xml	      	     subreadsTohifi-bi.sh
+m64219e_220809_225049.subreads.bam	        subreadsTohifi.sh
+m64219e_220809_225049.subreads.bam.pbi	     tmp-file-ce9f726a-c3c4-46e6-a88f-64c178b33ed6.txt
+```
+2. Although there is a fastq file in the `hifi_reads` folder, It is worth to keep the record of the filtering steps. So here is the filtering steps when converting the files file from bam to fastq
+```
+#####################  script content  ####################
+bamtools filter -in m64219e_220809_225049.subreads.bam -out hifireads/hifi_reads.bam -tag "rq":>=0.99
+
+bamtools filter -in m64219e_220809_225049.subreads.bam -out hifireads-1/hifi_reads.bam -tag "rq":>=0.99
+
+ccs --hifi-kinetics --min-rq 0.99 --report-file hifireads-2/hifi_report.txt m64219e_220809_225049.subreads.bam hifireads-2/hifi_reads.bam
+###########################################################
+```
+
+3. To further check the read quality, use FASTQC to get a look at the qulality summary.
+```
+[yimingweng@login2 raw_reads]$ sbatch hifi_fastqc.slurm Keiferia_lycopersicella_ccs.fastq.gz
+
+#####################  script content  ####################
+#!/bin/bash
+#SBATCH --job-name=hifi_read_fastqc
+#SBATCH --output=hifi_read_fastqc.log
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=8gb
+#SBATCH --time=02:00:00
+
+# sometimes the issue with perl version occur, then you see the error "symbol lookup error"
+# If so, try different version of perl and run fastqc
+
+## load order version of perl
+module load perl/5.20.0
+
+## load fastqc module
+module load fastqc/0.11.7
+
+input=${1}
+
+## run fastqc on the data
+fastqc ${input}
+###########################################################
+```
+
+- It seems ok with the data, as the GC content distribution is a bit sharp. It is unlikely to be the adaptor contamination as they should have been trimmed and also there is nothing detected in the overrepresented sequences.
+
+- collect results and move them into: `/blue/kawahara/yimingweng/Kely_genome_project/raw_reads/fastqc`
+```
+[yimingweng@login2 raw_reads]$ mkdir fastqc
+[yimingweng@login2 raw_reads]$ mv *fastqc* fastqc/
+```
+
+4. Check the basic statistics of the raw read data.
+```
+[yimingweng@login2 raw_reads]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/raw_reads
+
+zcat Keiferia_lycopersicella_ccs.fastq.gz | grep "/ccs$" | wc -l
+3839580 # there are 3,839,580 reads (~3.8 million reads) in the files
+
+zcat Keiferia_lycopersicella_ccs.fastq.gz | grep -v [^ATCG] | wc -c
+21133733487 # there are 21133733487 bps in the data (~ 21X if genome size is 500mbp, ~35X if genome is 300mbp)
+```
+
+5. Run KMC with the fastq read file
+```
+[yimingweng@login2 genome_size]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/genome_size
+
+sbatch fastq_KMC.slurm /blue/kawahara/yimingweng/Kely_genome_project/raw_reads/Keiferia_lycopersicella_ccs.fastq.gz Kely 21
+
+#####################  script content  ####################
+#!/bin/bash
+#SBATCH --job-name=Kely_kmc
+#SBATCH --output=Kely_kmc.log
+#SBATCH --mail-type=END,FAI
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --ntasks=1                   
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16gb
+#SBATCH --time=05:00:00 
+
+input=${1}
+prefix=${2}
+kmer=${3}
+
+module load kmc/3.2.1
+mkdir kmc_tmp
+
+kmc -k${kmer} ${input} ${prefix}_${kmer}mers kmc_tmp
+
+# Create text dump from KMC database binary format
+kmc_tools transform ${prefix}_${kmer}mers dump ${prefix}_${kmer}mers.txt
+
+# Create histogram from the txt file
+kmc_tools transform ${prefix}_${kmer}mers histogram ${prefix}_${kmer}mers.histo
+
+# remove the temporal directory
+rm -r kmc_tmp
+###########################################################
+```
+
+6. Get the kmer count distribution using [GenomeScope2](http://qb.cshl.edu/genomescope/genomescope2.0/). The result can be found [here](http://qb.cshl.edu/genomescope/genomescope2.0/analysis.php?code=mYfpkD8wYxxcIy48XpO0)
+- The estimated genome size is about 302 Mbp
+- The heterozygosity is fairly low, about 1%
+- The mean coverage is about 24.7X, slightly lower than expected
+- This is possibly due to the repeat regions at the 100X peak which is odd, as it seems that part of the gemome is **tetraploid**, as the repeats are ~25/~50/~100.
+![](http://qb.cshl.edu/genomescope/genomescope2.0/user_data/mYfpkD8wYxxcIy48XpO0/linear_plot.png)
+![](http://qb.cshl.edu/genomescope/genomescope2.0/user_data/mYfpkD8wYxxcIy48XpO0/transformed_linear_plot.png)
+
+7. Let's try K=27 and see if the 100X peak is retained.
+```
+[yimingweng@login2 genome_size]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/genome_size
+
+sbatch fastq_KMC.slurm /blue/kawahara/yimingweng/Kely_genome_project/raw_reads/Keiferia_lycopersicella_ccs.fastq.gz Kely 27
+```
+The result of K=27 can be found [here](http://qb.cshl.edu/genomescope/genomescope2.0/analysis.php?code=3w5G4b8elEYO96CcJdTX)
+- The estimated genome size is about 318 Mbp
+- The heterozygosity is still low, about 0.9%
+- The mean coverage is about 24.5X
+- The 100X peak is still there, which means that the repeats have some pattern or some duplication occurred. This is not novel, check this [example by Nagy et al](https://link.springer.com/article/10.1186/s12864-021-07627-w).
+![](http://qb.cshl.edu/genomescope/genomescope2.0/user_data/3w5G4b8elEYO96CcJdTX/linear_plot.png)
+![](http://qb.cshl.edu/genomescope/genomescope2.0/user_data/3w5G4b8elEYO96CcJdTX/transformed_linear_plot.png)
+
+5. Assemble the genome with hifisam
+```
+[yimingweng@login6 assemblies]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/assemblies
+
+mkdir kely_hifisam_default
+sbatch kely_hifisam_default.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=hifiasm_reassemble_kely
+#SBATCH -o hifiasm_reassemble_kely.log
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH -c 32
+#SBATCH --mem-per-cpu=10gb
+#SBATCH -t 30:00:00
+#SBATCH --account=kawahara
+#SBATCH --qos=kawahara-b
+
+module load ufrc
+module load hifiasm
+
+# to optimize the power of purging, try "-l 3"
+hifiasm -o /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam.asm \
+        -l 3 \
+        -t 32 \
+        /blue/kawahara/yimingweng/Kely_genome_project/raw_reads/Keiferia_lycopersicella_ccs.fastq.gz
+
+# convert the output file to fasta
+awk '/^S/{print ">"$2;print $3}' /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam.asm.bp.p_ctg.gfa > /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam_default.fasta
+########################################################################
 ```
