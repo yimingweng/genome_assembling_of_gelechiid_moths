@@ -668,8 +668,10 @@ purge_haplotigs  hist  \
 -g /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam_default.fasta  
 ########################################################################
 ```
+
 - step 2: determine the cutoffs of coverage for the contigs based on the coverage histogram. The cutoffs I would like to apply is min=5 and max=120. I will use this values to purge the contigs.
 <img src="https://github.com/yimingweng/Kely_genome_project/blob/main/aligned.bam.histogram.png?raw=true?raw=true">
+
 ```
 ###########################  script content  ###########################
 #!/bin/bash
