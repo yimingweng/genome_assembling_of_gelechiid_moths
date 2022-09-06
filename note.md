@@ -917,14 +917,18 @@ blobtools filter --table Kely_purge_summary.tsv /blue/kawahara/yimingweng/Kely_g
 ########################################################################
 ```
 2. Once the blobtool works without error, we should see an output file generated in the current working directory (not in the database folder). Here it's called Kely_purge_summary.tsv
-    - use local computer (my dell laptop) to draw the plot with R (I am drawing the blobplot by myself because I can't find the command line function working in blobtools v2 to draw the plot, and it looks like an [unfinished work](https://github.com/blobtoolkit/blobtoolkit/issues/16). Or it seems reply on the GUI tool called BlobToolKit Viewer).
+- use local computer (my dell laptop) to draw the plot with R (I am drawing the blobplot by myself because I can't find the command line function working in blobtools v2 to draw the plot, and it looks like an [unfinished work](https://github.com/blobtoolkit/blobtoolkit/issues/16). Or it seems reply on the GUI tool called BlobToolKit Viewer).
+
 ```
 yiming@DESKTOP-H41N7NT:/mnt/c/Users/wengz/Dropbox/postdoc/Kely_genome_project$ pwd
 /mnt/c/Users/wengz/Dropbox/postdoc/Kely_genome_project
 
 scp  yimingweng@hpg.rc.ufl.edu:/blue/kawahara/yimingweng/Kely_genome_project/blobplot/Kely_purge_summary.tsv ./
 ```
-    - Run the Rscipt to generate the plot
+
+- Run the Rscipt to generate the plot
+
+
 ```
 ###### R environment ######
 # this script is used to plot the blobplot for Keiferia genome
@@ -949,5 +953,6 @@ ggplot(contig_dat, aes(x=gc, y=purging_aligned_cov, size=length, col=bestsumorde
   theme(panel.border = element_blank(), panel.grid.major = element_blank(),
                        panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
 ```
-    - Here is the result, there is a very small contig likely to be from a plant
+    
+- Here is the result, there is a very small contig likely to be from a plant. I think it needs to be removed from the genome assembly.
 <img src="https://github.com/yimingweng/Kely_genome_project/blob/main/blobplot/Kely_purge_blobplot.jpeg?raw=true?raw=true">
