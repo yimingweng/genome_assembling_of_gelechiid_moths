@@ -11,7 +11,7 @@ ggplot(contig_dat, aes(x=gc, y=purging_aligned_cov, size=length, col=bestsumorde
   scale_color_manual(values=c("blue", "darkgreen")) +
   geom_point(alpha=0.2) +
   scale_size(range = c(2, 10), name="length") +
-  scale_x_continuous(name="Speed of cars", limits=c(0, 1)) +
+  scale_x_continuous(limits=c(0, 1)) +
   ylab("Contig coverage") +
   xlab("GC proportion") +
   guides(size = "none") +
