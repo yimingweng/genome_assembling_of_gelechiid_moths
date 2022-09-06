@@ -668,9 +668,8 @@ purge_haplotigs  hist  \
 -g /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam_default.fasta  
 ########################################################################
 ```
-
 - step 2: determine the cutoffs of coverage for the contigs based on the coverage histogram. The cutoffs I would like to apply is min=5 and max=120. I will use this values to purge the contigs.
-<img src="https://github.com/yimingweng/Kely_genome_project/blob/main/aligned.bam.histogram.png?raw=true?raw=true">
+<img src="https://github.com/yimingweng/Kely_genome_project/blob/main/kmer_plots/aligned.bam.histogram.png?raw=true?raw=true">
 
 ```
 ###########################  script content  ###########################
@@ -749,19 +748,19 @@ sbatch universal_run_busco.slurm /blue/kawahara/yimingweng/Kely_genome_project/p
 fasta=${1} # the full path of genome fasta file
 outprefix=${2} # the name desired to be for the putput
 
-# copy the contig files from `/blue/kawahara/yimingweng/LepidoPhylo_Project/busco_out/`
+# copy the contig files from `/blue/kawahara/yimingweng/LepidoPhylo_Project/busco_out/
 cp -r /blue/kawahara/yimingweng/LepidoPhylo_Project/busco_out/Augustus ./
 cp -r /blue/kawahara/yimingweng/LepidoPhylo_Project/busco_out/config.ini ./
 
 export BUSCO_CONFIG_FILE="blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/config.ini"
 export AUGUSTUS_CONFIG_PATH="/blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/Augustus/config/"
 
-# load busco, make sure this is the latest version
+#load busco, make sure this is the latest version
 module load busco/5.3.0
 
 mkdir ${outprefix}
 
-# run busco command
+#run busco command
 busco -f -i ${fasta} \
  -o ./${outprefix} \
  -l /data/reference/busco/v5/lineages/endopterygota_odb10 \
@@ -775,7 +774,7 @@ BUSCO: C:98.0%[S:96.9%,D:1.1%],F:0.5%,M:1.5%,n:2124. However, it will be better 
 
 
 5. Using [blobplot](https://blobtools.readme.io/docs) to identify the non-target sequences in the genome assembly. See the instruction [here](https://blobtools.readme.io/docs/my-first-blobplot) to do the work.
-- create the database (blastdb) for [hits](https://blobtools.readme.io/docs/taxonomy-file) file, one of the requred input to make blobplot.
+- create the database (blastdb) for [hits](https://blobtools.readme.io/docs/taxonomy-file) file, one of the requred input to make blobplot. <span style="color:red"> After testing `blastn` function without the downloaded database, the local nt database is not required. So I have removed the database as it takes too much storing space <sapn />
 ```
 [yimingweng@login2 blastdb]$ pwd
 /blue/kawahara/yimingweng/Kely_genome_project/blobplot/blastdb
@@ -787,6 +786,168 @@ BUSCO: C:98.0%[S:96.9%,D:1.1%],F:0.5%,M:1.5%,n:2124. However, it will be better 
 # to make it work, make sure you load the perl module
 module load perl/5.24.1
 
-# test this perl script
+#test this perl script
 ./update_blastdb.pl --help
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=ncbi_nt_download
+#SBATCH -o ncbi_nt_download.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=1gb
+#SBATCH -t 12:00:00
+#SBATCH -c 24
+
+chmod +x  update_blastdb.pl
+module load perl/5.24.1
+
+perl ./update_blastdb.pl --passive --decompress nr
+########################################################################
 ```
+2. Although it is not sure I will have to download the database, I can take the next step to blast the contigs to the nt database. 
+
+```
+sbatch kely_megablast_nt.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=kely_megablast_nt
+#SBATCH -o kely_megablast_nt.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 72:00:00
+#SBATCH -c 64
+
+module load ncbi_blast/2.10.1
+
+blastn \
+-task megablast \
+-query /blue/kawahara/yimingweng/Kely_genome_project/purging/Kely_purge_15X_120X.fasta \
+-db nt \
+-outfmt '6 qseqid staxids bitscore std' \
+-max_target_seqs 1 \
+-max_hsps 1 \
+-num_threads 24 \
+-evalue 1e-25 \
+-out kely_purge_assembly.nt.mts1.hsp1.1e25.megablast.out
+########################################################################
+```
+
+<br />
+
+## **09/03/2022**  
+**\# blobplot**  
+1. Now prepare another input files for blobplot: the mapped reads file. Note that I have used minimap2 to do the similar work but that was on the original assembly. So I will have to repeat this work on the purged assembly again for the blobplot.
+
+```
+[yimingweng@login5 blobplot]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/blobplot
+
+sbatch kely_minimap_purge.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=kely_minimap_purge
+#SBATCH -o kely_minimap_purge.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 8:00:00
+#SBATCH -c 8
+
+module load minimap/2.21
+module load samtools/1.15
+
+minimap2 -t 8 -ax map-pb /blue/kawahara/yimingweng/Kely_genome_project/purging/Kely_purge_15X_120X.fasta \
+/blue/kawahara/yimingweng/Kely_genome_project/raw_reads/Keiferia_lycopersicella_ccs.fastq.gz \
+--secondary=no \
+| samtools sort -m 1G -o purging_aligned.bam -T tmp.ali
+########################################################################
+```
+
+## **09/05/2022**  
+**\# blobplot** 
+1. With the three input files ready (the genome assembly, the reads mapped to the assembly in bam format, and the hit file by blasting the contig to the NCBI nt database), let's run blobplot create function to creating a blobDB. Note that the example command in the [instruction](https://blobtools.readme.io/docs/my-first-blobplot) at this step is not very useful (at least to me), so consider googling around if encountering errors.
+
+```
+# create a directory storing the result
+mkdir kely_blobplot
+
+sbatch kely_blobDB.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=Kely_blobDB
+#SBATCH -o Kely_blobDB.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=2gb
+#SBATCH -t 8:00:00
+#SBATCH -c 8
+
+module load blobtools/2.2
+
+# create blobDB
+blobtools create \
+--fasta /blue/kawahara/yimingweng/Kely_genome_project/purging/Kely_purge_15X_120X.fasta \
+--cov /blue/kawahara/yimingweng/Kely_genome_project/blobplot/purging_aligned.bam \
+Kely_purge_DB
+
+# get the node.dmp file from NCBI, and put it in ./Kely_purge_DB
+cd ./Kely_purge_DB
+wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/new_taxdump/new_taxdump.tar.gz
+tar xzf new_taxdump.tar.gz
+cd ..
+
+# add the tax and blast results
+blobtools add \
+--taxdump /blue/kawahara/yimingweng/Kely_genome_project/blobplot/Kely_purge_DB/ \
+--taxid 1511202 \
+--hits /blue/kawahara/yimingweng/Kely_genome_project/blobplot/kely_purge_assembly.nt.mts1.hsp1.1e25.megablast.out \
+Kely_purge_DB
+
+# create summary tsv file
+blobtools filter --table Kely_purge_summary.tsv /blue/kawahara/yimingweng/Kely_genome_project/blobplot/Kely_purge_DB/
+########################################################################
+```
+2. Once the blobtool works without error, we should see an output file generated in the current working directory (not in the database folder). Here it's called Kely_purge_summary.tsv
+    - use local computer (my dell laptop) to draw the plot with R (I am drawing the blobplot by myself because I can't find the command line function working in blobtools v2 to draw the plot, and it looks like an [unfinished work](https://github.com/blobtoolkit/blobtoolkit/issues/16). Or it seems reply on the GUI tool called BlobToolKit Viewer).
+```
+yiming@DESKTOP-H41N7NT:/mnt/c/Users/wengz/Dropbox/postdoc/Kely_genome_project$ pwd
+/mnt/c/Users/wengz/Dropbox/postdoc/Kely_genome_project
+
+scp  yimingweng@hpg.rc.ufl.edu:/blue/kawahara/yimingweng/Kely_genome_project/blobplot/Kely_purge_summary.tsv ./
+```
+    - Run the Rscipt to generate the plot
+```
+###### R environment ######
+# this script is used to plot the blobplot for Keiferia genome
+# please modify this script for the use on the other cases
+library(ggplot2)
+
+
+path <- getwd()
+contig_dat <- read.table(paste0(path, "/Kely_purge_summary.tsv"), header=T, sep="\t")
+
+x11()
+ggplot(contig_dat, aes(x=gc, y=purging_aligned_cov, size=length, col=bestsumorder_phylum)) + 
+  scale_color_manual(values=c("blue", "darkgreen")) +
+  geom_point(alpha=0.2) +
+  scale_size(range = c(2, 10), name="length") +
+  scale_x_continuous(name="Speed of cars", limits=c(0, 1)) +
+  ylab("Contig coverage") +
+  xlab("GC proportion") +
+  guides(size = "none") +
+  guides(color=guide_legend(override.aes = list(size=3), title="best blast phylum")) +
+  theme_bw() + 
+  theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+                       panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+```
+    - Here is the result, there is a very small contig likely to be from a plant
+<img src="https://github.com/yimingweng/Kely_genome_project/blob/main/blobplot/Kely_purge_blobplot.jpeg?raw=true?raw=true">
