@@ -669,7 +669,7 @@ purge_haplotigs  hist  \
 ########################################################################
 ```
 - step 2: determine the cutoffs of coverage for the contigs based on the coverage histogram. The cutoffs I would like to apply is min=5 and max=120. I will use this values to purge the contigs.
-<img src="https://github.com/yimingweng/Kely_genome_project/blob/main/kmer_plots/aligned.bam.histogram.png?raw=true?raw=true">
+<img src="https://github.com/yimingweng/Kely_genome_project/blob/main/aligned.bam.histogram.png?raw=true?raw=true">
 
 ```
 ###########################  script content  ###########################
@@ -831,7 +831,7 @@ blastn \
 -outfmt '6 qseqid staxids bitscore std' \
 -max_target_seqs 1 \
 -max_hsps 1 \
--num_threads 24 \
+-num_threads 64 \
 -evalue 1e-25 \
 -out kely_purge_assembly.nt.mts1.hsp1.1e25.megablast.out
 ########################################################################
@@ -875,8 +875,8 @@ minimap2 -t 8 -ax map-pb /blue/kawahara/yimingweng/Kely_genome_project/purging/K
 1. With the three input files ready (the genome assembly, the reads mapped to the assembly in bam format, and the hit file by blasting the contig to the NCBI nt database), let's run blobplot create function to creating a blobDB. Note that the example command in the [instruction](https://blobtools.readme.io/docs/my-first-blobplot) at this step is not very useful (at least to me), so consider googling around if encountering errors.
 
 ```
-# create a directory storing the result
-mkdir kely_blobplot
+[yimingweng@login6 blobplot]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/blobplot
 
 sbatch kely_blobDB.slurm
 
@@ -956,3 +956,144 @@ ggplot(contig_dat, aes(x=gc, y=purging_aligned_cov, size=length, col=bestsumorde
     
 - Here is the result, there is a very small contig likely to be from a plant. I think it needs to be removed from the genome assembly.
 <img src="https://github.com/yimingweng/Kely_genome_project/blob/main/blobplot/Kely_purge_blobplot.jpeg?raw=true?raw=true">
+
+## **09/06/2022**  
+**\# blobplot**
+**\# repeatmodeler**
+1. It would be interesting to look at the blobplot for the original (default) genome assembly too. So repeat the work for the original assembly to see what were trimmed by the purging step for future reference.
+- blast the original assembly
+
+```
+[yimingweng@login5 blobplot]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/blobplo
+
+sbatch megablast_nt.slurm /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam_default.fasta kely_hifisam_default
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=kely_megablast_nt
+#SBATCH -o kely_megablast_nt.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 72:00:00
+#SBATCH -c 64
+
+module load ncbi_blast/2.10.1
+
+assembly=${1}
+outprefix=${2}
+
+blastn \
+-task megablast \
+-query ${assembly} \
+-db nt \
+-outfmt '6 qseqid staxids bitscore std' \
+-max_target_seqs 1 \
+-max_hsps 1 \
+-num_threads 64 \
+-evalue 1e-25 \
+-out ${outprefix}.megablast.out
+########################################################################
+```
+
+- make the plot database
+
+```
+[yimingweng@login6 blobplot]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/blobplot
+
+# run the slurm script for blobplot
+sbatch blobDB.slurm \
+/blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam_default.fasta \
+/blue/kawahara/yimingweng/Kely_genome_project/purging/aligned.bam \
+Kely_original_assembly_blobDB \
+1511202 \
+/blue/kawahara/yimingweng/Kely_genome_project/blobplot/kely_hifisam_default.megablast.out \
+Kely_original_assembly_blobDB
+
+# 6 arguments
+# first: the full path to the input fasta of the assembly
+# second: the full path to the bam file where the reads were mapped to the target assembly
+# thrid: the output prefix for the blob database which will be a directory
+# forth: taxid, check NCBI for the taxid for your species
+# fifth: the metablast out put from the blastn command (usually the output from previous step)
+# sixth: the output prefix for the final table in tsv format which will be in the current directory
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=assembly_blobDB
+#SBATCH -o blobDB.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=2gb
+#SBATCH -t 8:00:00
+#SBATCH -c 8
+
+module load blobtools/2.2
+
+fasta=${1}
+bam=${2}
+dbprefix=${3}
+taxid=${4}
+metablast=${5}
+tsvprefix=${6}
+
+# create blobDB
+blobtools create \
+--fasta ${fasta} \
+--cov ${bam} \
+${dbprefix}
+
+# get the node.dmp file from NCBI, and put it in ./Kely_purge_DB
+cd ./${dbprefix}
+wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/new_taxdump/new_taxdump.tar.gz
+tar xzf new_taxdump.tar.gz
+path=$(pwd)
+cd ..
+
+# add the tax and blast results
+blobtools add \
+--taxdump ${path} \
+--taxid ${taxid} \
+--hits ${metablast} \
+${dbprefix}
+
+# create summary tsv file
+blobtools filter --table ${tsvprefix}.tsv ${path}
+########################################################################
+```
+- Use R to visualize the result
+```
+###### R environment ######
+# this script is used to plot the blobplot for Keiferia genome
+# please modify this script for the use on the other cases
+library(ggplot2)
+
+path <- getwd()
+contig_dat <- read.table(paste0(path, "/Kely_original_assembly_blobDB.tsv"), header=T, sep="\t")
+
+x11()
+ggplot(contig_dat, aes(x=gc, y=log(aligned_cov), size=length, col=bestsumorder_phylum)) + 
+  scale_color_manual(values=c("blue", "grey", "red")) +
+  geom_point(alpha=0.2) +
+  scale_size(range = c(2, 10), name="length") +
+  scale_x_continuous(limits=c(0, 1)) +
+  geom_hline(yintercept=log(120), linetype="dashed", 
+             color = "red", size=0.5) +
+  geom_hline(yintercept=log(5), linetype="dashed", 
+             color = "red", size=0.5) +
+  ylab("log(Contig coverage)") +
+  xlab("GC proportion") +
+  guides(size = "none") +
+  guides(color=guide_legend(override.aes = list(size=3), title="best blast phylum")) +
+  theme_bw() + 
+  theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+```
+- The result is showing here. I have put some notes here. The top two contigs with highest coverage are mitochondrial genome (by blasting the contig to get the result). And purging step has removed another 3 contigs that belone to Arthropod due to the extreme high (>120X) and low (<5X) coverage. 
+- And because we don't know whether the 3 contigs being trimmed are false or true duplication, I believe **both genome assemblies should be published together** to ensure that all the bioinformation is kept.
+
+<img src="https://github.com/yimingweng/Kely_genome_project/blob/main/blobplot/Kely_origianl_assembly_blobplot_modified.jpg?raw=true?raw=true">
