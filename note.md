@@ -43,7 +43,7 @@ ssh yimingweng@hpg.rc.ufl.edu
 ```
 
 - Download the PacBio read file [SRR15658214](https://www.ncbi.nlm.nih.gov/sra/SRX11955122[accn]) from NCBI (the file is about 12Gb in size, and it takes about 2-3 Hrs to download using fastq-dump tool)
-- For more information using slurm to submit/manage the job on the cluster mechine, check [this](https://slurm.schedmd.com/quickstart.html) out!
+- For more information using slurm to submit/manage the job on the cluster machine, check [this](https://slurm.schedmd.com/quickstart.html) out!
 
 ```
 # /blue/kawahara/yimingweng
@@ -105,7 +105,7 @@ zcat SRR15658214.fastq.gz | grep -v "@" | grep "AAAAAAAAAAAAAAAAAATTAACGGAGGAGGA
 
 ## **08/10/2022**
 - A pilot run for the use of [K-Mer Counter (KMC) v.3.1.1](https://github.com/refresh-bio/KMC) with *Plodia interpunctella* HiFi reads (**Continue**).
-- Check the verison of KMC on the server
+- Check the version of KMC on the server
 ```
 [yimingweng@login2 yimingweng]$ pwd
 /blue/kawahara/yimingweng
@@ -260,7 +260,7 @@ ccs --hifi-kinetics --min-rq 0.99 --report-file hifireads-2/hifi_report.txt m642
 ###########################################################
 ```
 
-3. To further check the read quality, use FASTQC to get a look at the qulality summary.
+3. To further check the read quality, use FASTQC to get a look at the quality summary.
 ```
 [yimingweng@login2 raw_reads]$ sbatch hifi_fastqc.slurm Keiferia_lycopersicella_ccs.fastq.gz
 
@@ -353,7 +353,7 @@ rm -r kmc_tmp
 - The estimated genome size is about 302 Mbp
 - The heterozygosity is fairly low, about 1%
 - The mean coverage is about 24.7X, slightly lower than expected
-- This is possibly due to the repeat regions at the 100X peak which is odd, as it seems that part of the gemome is **tetraploid**, as the repeats are ~25/~50/~100.
+- This is possibly due to the repeat regions at the 100X peak which is odd, as it seems that part of the genome is **tetraploid**, as the repeats are ~25/~50/~100.
 ![](http://qb.cshl.edu/genomescope/genomescope2.0/user_data/mYfpkD8wYxxcIy48XpO0/linear_plot.png)
 ![](http://qb.cshl.edu/genomescope/genomescope2.0/user_data/mYfpkD8wYxxcIy48XpO0/transformed_linear_plot.png)
 
@@ -629,7 +629,7 @@ cat: short_summary.specific.endopterygota_odb10.busco_out.: No such file or dire
         32      Missing BUSCOs (M)
         2124    Total BUSCO groups searched
 ```
-3. The result of busco looks good, it has the completeness (C) of **98.1%** but like it is expected, the duplication rate is a bit high (it's **2.3%** and usually I see duplucation rate between 0.5%-2%). So let's go over the [purge_haplotigs pipeline](https://bitbucket.org/mroachawri/purge_haplotigs/src/master/). There are several steps in this pipeline, let's do it step by step.
+3. The result of busco looks good, it has the completeness (C) of **98.1%** but like it is expected, the duplication rate is a bit high (it's **2.3%** and usually I see duplication rate between 0.5%-2%). So let's go over the [purge_haplotigs pipeline](https://bitbucket.org/mroachawri/purge_haplotigs/src/master/). There are several steps in this pipeline, let's do it step by step.
 -  step 1: map the raw reads (subreads) to the target genome assembly.
 
 ```
@@ -774,7 +774,7 @@ BUSCO: C:98.0%[S:96.9%,D:1.1%],F:0.5%,M:1.5%,n:2124. However, it will be better 
 
 
 5. Using [blobplot](https://blobtools.readme.io/docs) to identify the non-target sequences in the genome assembly. See the instruction [here](https://blobtools.readme.io/docs/my-first-blobplot) to do the work.
-- create the database (blastdb) for [hits](https://blobtools.readme.io/docs/taxonomy-file) file, one of the requred input to make blobplot. <span style="color:red"> After testing `blastn` function without the downloaded database, the local nt database is not required. So I have removed the database as it takes too much storing space <sapn />
+- create the database (blastdb) for [hits](https://blobtools.readme.io/docs/taxonomy-file) file, one of the required input to make blobplot. <span style="color:red"> After testing `blastn` function without the downloaded database, the local nt database is not required. So I have removed the database as it takes too much storing space <sapn />
 ```
 [yimingweng@login2 blastdb]$ pwd
 /blue/kawahara/yimingweng/Kely_genome_project/blobplot/blastdb
@@ -959,7 +959,7 @@ ggplot(contig_dat, aes(x=gc, y=purging_aligned_cov, size=length, col=bestsumorde
 
 ## **09/06/2022**  
 **\# blobplot**
-**\# repeatmodeler**
+
 1. It would be interesting to look at the blobplot for the original (default) genome assembly too. So repeat the work for the original assembly to see what were trimmed by the purging step for future reference.
 - blast the original assembly
 
@@ -1093,7 +1093,66 @@ ggplot(contig_dat, aes(x=gc, y=log(aligned_cov), size=length, col=bestsumorder_p
   theme(panel.border = element_blank(), panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
 ```
-- The result is showing here. I have put some notes here. The top two contigs with highest coverage are mitochondrial genome (by blasting the contig to get the result). And purging step has removed another 3 contigs that belone to Arthropod due to the extreme high (>120X) and low (<5X) coverage. 
+- The result is showing here. I have put some notes here. The top two contigs with highest coverage are mitochondrial genome (by blasting the contig to get the result). And purging step has removed another 3 contigs that belong to Arthropod due to the extreme high (>120X) and low (<5X) coverage. 
 - And because we don't know whether the 3 contigs being trimmed are false or true duplication, I believe **both genome assemblies should be published together** to ensure that all the bioinformation is kept.
 
 <img src="https://github.com/yimingweng/Kely_genome_project/blob/main/blobplot/Kely_origianl_assembly_blobplot_modified.jpg?raw=true?raw=true">
+
+<br />
+
+## **09/07/2022**  
+**\# busco**
+**\# RepeatModeler2**  
+
+1. Because there is a putative non-target contig in the assembly (ptg000079l), check the BUSCO result to see if any contribution was made from this contig:
+- If so, them remove the contig and redo the BUSCO
+- if not, them remove the contig and move on to annotation (no need to repeat the BUSCO as the result should not change)
+
+```
+[yimingweng@login5 run_endopterygota_odb10]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/busco/Kely_purge_15X_120X/Kely_purge_15X_120X/run_endopterygota_odb10
+
+[yimingweng@login5 run_endopterygota_odb10]$ cat full_table.tsv | grep "ptg000079l"
+# not thing has returned, ther is no busco genes related to this contig
+```
+
+2. manually make the final assembly by removing the putative non-target contig from the purged genome
+```
+# make final genome assembly
+[yimingweng@login5 kely_final]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_final
+
+sed -e '/ptg000079l/,+1d' /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_purging/Kely_purge_15X_120X.fasta > kely_final_assembly.fasta
+
+cat /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam_default.fasta | grep -A1  "ptg000073c" > kely_mito_genome.fasta
+```
+
+3. With the final genome ready, let's start to annotate this genome
+```
+[yimingweng@login6 annotation]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation
+
+sbatch repeatmodeler.slurm /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_final/kely_final_assembly.fasta kely_repeatmodeler
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=kely_repeatmodeler2.slurm
+#SBATCH -o kely_repeatmodeler2.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 08:00:00
+#SBATCH -c 30
+
+module load repeatmodeler/2.0
+
+genome=${1} # full path to the genome assembly
+outprefix=${2}
+
+# build the RM2 database for the genome
+BuildDatabase -name kely_genome ${genome}
+
+# run RepeatModeler with the database
+RepeatModeler -database kely_genome -pa 10 -LTRStruct >& ${outprefix}.out
+```
