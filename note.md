@@ -1145,7 +1145,11 @@ sbatch repeatmodeler.slurm /blue/kawahara/yimingweng/Kely_genome_project/assembl
 #SBATCH -t 08:00:00
 #SBATCH -c 30
 
+export LC_CTYPE=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
 module load repeatmodeler/2.0
+module load seqkit/2.0.0
 
 genome=${1} # full path to the genome assembly
 outprefix=${2}
@@ -1155,4 +1159,635 @@ BuildDatabase -name kely_genome ${genome}
 
 # run RepeatModeler with the database
 RepeatModeler -database kely_genome -pa 10 -LTRStruct >& ${outprefix}.out
+
+cat kely_genome-families.fa | seqkit fx2tab | awk '{ print "Kely_1.0_"$0 }' | seqkit tab2fx > kely_genome-families.prefix.fa
+cat kely_genome-families.prefix.fa | seqkit fx2tab | grep -v "Unknown" | seqkit tab2fx > kely-genome-families.prefix.fa.known
+cat kely_genome-families.prefix.fa | seqkit fx2tab | grep "Unknown" | seqkit tab2fx > kely-genome-families.prefix.fa.unknown
+```
+
+## **09/07/2022**  
+**\# RepeatMasker**  
+
+With the run on repeatmodeler2 finished, let's move on to masking the genome with the information generated from repeatmodeler2. However, I think it is good idea to follow [Dr. Card's suggestions](https://darencard.net/blog/2022-07-09-genome-repeat-annotation/) about how to comprehensively mask a genome with repeat sequences. There are four steps, and I am going to do them in four separated scripts.
+1. Step1: mask the simple repeats
+```
+sbatch kely_repeatmask_step1.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=kely_repeatmask_step1
+#SBATCH -o kely_repeatmask_step1.out
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 120:00:00
+#SBATCH -c 16
+
+mkdir kely_repeatmasker_step1
+
+export LC_CTYPE=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+module load repeatmasker/4.1.1
+
+RepeatMasker -pa 16 -a -s \
+-xsmall \
+-e RMBlast \
+-gff \
+-noint \
+-no_is \
+-dir kely_repeatmasker_step1 \
+/blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_final/kely_final_assembly.fasta &> kely_repeatmasker_step1.out
+########################################################################
+```
+
+2. Step2: mask repeats based on existing databases by specifying target taxa (here I use Lepidoptera)
+<span style="color:red"> **(this script has been modified we rerun, see below)** <span>
+
+```
+sbatch kely_repeatmask_step2.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=kely_repeatmask_step2
+#SBATCH -o kely_repeatmask_step2.out
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 120:00:00
+#SBATCH -c 16
+
+mkdir kely_repeatmasker_step2
+
+export LC_CTYPE=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+module load repeatmasker/4.1.1
+
+RepeatMasker -pa 16 -a -s \
+-e RMBlast \
+-gff \
+-no_is \
+-species Lepidoptera \
+-dir kely_repeatmasker_step2 \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/kely_repeatmasker_step1/kely_final_assembly.fasta.masked &> kely_repeatmasker_step2.out
+
+mv kely_repeatmask_step2.out kely_repeatmasker_step2
+########################################################################
+```
+
+3. Step3: mask repeats based on the known repeats from RepeatModeler
+<span style="color:red"> **(this script has been modified we rerun, see below)** <span>
+
+```
+sbatch kely_repeatmask_step3.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=kely_repeatmask_step3
+#SBATCH -o kely_repeatmask_step3.out
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 120:00:00
+#SBATCH -c 16
+
+mkdir kely_repeatmasker_step3
+
+export LC_CTYPE=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+module load repeatmasker/4.1.1
+
+RepeatMasker -pa 16 -a -s \
+-e RMBlast \
+-gff \
+-no_is \
+-lib /blue/kawahara/yimingweng/Kely_genome_project/annotation/kely-genome-families.prefix.fa.known \
+-dir kely_repeatmasker_step3 \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/kely_repeatmasker_step2/kely_final_assembly.fasta.masked.masked &> kely_repeatmasker_step3.out
+
+mv kely_repeatmask_step3.out kely_repeatmasker_step3
+########################################################################
+```
+
+4. Step4: mask repeats based on the unknown repeats from RepeatModeler
+<span style="color:red"> **(this script has been modified we rerun, see below)** <span>
+
+```
+sbatch kely_repeatmask_step4.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=kely_repeatmask_step4
+#SBATCH -o kely_repeatmask_step4.out
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 120:00:00
+#SBATCH -c 16
+
+mkdir kely_repeatmasker_step4
+
+export LC_CTYPE=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+module load repeatmasker/4.1.1
+
+RepeatMasker -pa 16 -a -s \
+-e RMBlast \
+-gff \
+-no_is \
+-lib /blue/kawahara/yimingweng/Kely_genome_project/annotation/kely-genome-families.prefix.fa.unknown \
+-dir kely_repeatmasker_step4 \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/kely_repeatmasker_step3/kely_final_assembly.fasta.masked.masked.masked &> kely_repeatmasker_step4.out
+
+mv kely_repeatmask_step4.out kely_repeatmasker_step4
+########################################################################
+```
+<br />
+
+## **09/21/2022**  
+**\# RepeatMasker** (rerun)
+
+After checking the repeat masking result, I found that all the repeats were masked by hardmask (ATCG -> N), which I think is too strict. Let's check where we loss the softmasked nucleotide.
+```
+[yimingweng@login5 annotation]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation
+cat kely_repeatmasker_step1/kely_final_assembly.fasta.masked | grep -v ">" | tr -dc a-z | wc -c
+# 6340932
+
+cat kely_repeatmasker_step2/kely_final_assembly.fasta.masked.masked | grep -v ">" | tr -dc a-z | wc -c
+0
+```
+
+The softmask nucleotides were gone in the second step where I applied the lepidopteran library. So let's rerun RepeatMasker again from step 2 with -xsmall option applied
+- rerun Step2: mask repeats based on existing databases by specifying target taxa (here I use Lepidoptera)
+```
+sbatch kely_repeatmask_step2.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=kely_repeatmask_step2
+#SBATCH -o kely_repeatmask_step2.out
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 120:00:00
+#SBATCH -c 16
+
+mkdir kely_repeatmasker_step2
+
+export LC_CTYPE=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+module load repeatmasker/4.1.1
+
+RepeatMasker -pa 16 -a -s \
+-xsmall \
+-e RMBlast \
+-gff \
+-no_is \
+-species Lepidoptera \
+-dir kely_repeatmasker_step2 \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/kely_repeatmasker_step1/kely_final_assembly.fasta.masked &> kely_repeatmasker_step2.out
+
+mv kely_repeatmask_step2.out kely_repeatmasker_step2
+########################################################################
+```
+- track the number of softmasking nucleotide
+```
+cat kely_repeatmasker_step2/kely_final_assembly.fasta.masked.masked | grep -v ">" | tr -dc a-z | wc -c
+6416179
+```
+
+
+- rerun Step3: mask repeats based on the known repeats from RepeatModeler
+```
+sbatch kely_repeatmask_step3.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=kely_repeatmask_step3
+#SBATCH -o kely_repeatmask_step3.out
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 120:00:00
+#SBATCH -c 16
+
+mkdir kely_repeatmasker_step3
+
+export LC_CTYPE=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+module load repeatmasker/4.1.1
+
+RepeatMasker -pa 16 -a -s \
+-xsmall \
+-e RMBlast \
+-gff \
+-no_is \
+-lib /blue/kawahara/yimingweng/Kely_genome_project/annotation/kely-genome-families.prefix.fa.known \
+-dir kely_repeatmasker_step3 \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/kely_repeatmasker_step2/kely_final_assembly.fasta.masked.masked &> kely_repeatmasker_step3.out
+
+mv kely_repeatmask_step3.out kely_repeatmasker_step3
+########################################################################
+```
+
+- track the number of softmasking nucleotide
+```
+cat kely_repeatmasker_step3/kely_final_assembly.fasta.masked.masked.masked | grep -v ">" | tr -dc a-z | wc -c
+182220265
+```
+
+- rerun Step4: mask repeats based on the unknown repeats from RepeatModeler
+```
+sbatch kely_repeatmask_step4.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=kely_repeatmask_step4
+#SBATCH -o kely_repeatmask_step4.out
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 120:00:00
+#SBATCH -c 16
+
+mkdir kely_repeatmasker_step4
+
+export LC_CTYPE=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+module load repeatmasker/4.1.1
+
+RepeatMasker -pa 16 -a -s \
+-xsmall \
+-e RMBlast \
+-gff \
+-no_is \
+-lib /blue/kawahara/yimingweng/Kely_genome_project/annotation/kely-genome-families.prefix.fa.unknown \
+-dir kely_repeatmasker_step4 \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/kely_repeatmasker_step3/kely_final_assembly.fasta.masked.masked.masked &> kely_repeatmasker_step4.out
+
+mv kely_repeatmask_step4.out kely_repeatmasker_step4
+cp kely_repeatmasker_step4/kely_final_assembly.fasta.masked.masked.masked.masked ./
+mv kely_final_assembly.fasta.masked.masked.masked.masked kely_final_masked.fasta
+########################################################################
+```
+
+
+- track the number of softmasking nucleotide
+```
+cat kely_repeatmasker_step3/kely_final_assembly.fasta.masked.masked.masked | grep -v ">" | grep [a-z] | wc -c
+214171224
+```
+
+- store the final masked genome in the assembly folder (`/blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_repeat_mask/`)
+```
+cp kely_repeatmasker_step4/kely_final_assembly.fasta.masked.masked.masked.masked /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_repeat_mask/
+mv /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_repeat_mask/kely_final_assembly.fasta.masked.masked.masked.masked /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_repeat_mask/kely_final_repeatmasked.fasta
+```
+<br />
+
+## **09/22/2022**  
+**\# genome annotation**  
+**\# BRAKER2** 
+
+With the genome with repeats masked, let's try annotate the genome with functional genes using [BRAKER2](https://github.com/Gaius-Augustus/BRAKER#braker-with-proteins-of-any-evolutionary-distance). For this species, I will use the pipeline to run braker with proteins of any evolutionary distance .Later to use the RNA sequence of *Tuta absoluta* (species in the same subfamily to *Keferia*) published by [Camargo et al, 2015](https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-015-1841-5) to improve the gene model. <span style="color:red"> (at this point, I am not very certain whether including the RNA sequence data from *Tuta* will improve or disprove the gene model) </span>. I also took suggestions from this [instruction](https://bioinformaticsworkbook.org/dataAnalysis/GenomeAnnotation/Intro_to_Braker2.html#gsc.tab=0) by Dr. Masonbrink for running bracker2.
+
+1. step1. get the protein database from OrthoDB which is recommended by the authors
+```
+[yimingweng@login6 annotation]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation
+
+# download the protein files and put them together
+wget https://v101.orthodb.org/download/odb10_arthropoda_fasta.tar.gz
+tar xvf odb10_arthropoda_fasta.tar.gz
+cat arthropoda/Rawdata/* > proteins.fasta
+```
+
+2. step2: Running [ProtHint](https://github.com/gatech-genemark/ProtHint#protein-database-preparation) to get the protein gff file. The gff file here is the tab delimited format file containing the coordinates and related information of the identified proteins based on the provided database (protein.fasta in this case).
+```
+sbatch -J Kely_ProtHint ProtHint.slurm /blue/kawahara/yimingweng/Kely_genome_project/annotation/kely_final_masked.fasta /blue/kawahara/yimingweng/Kely_genome_project/annotation/proteins.fasta 
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=%x_%j
+#SBATCH --output=%x_%j.log
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mem-per-cpu=4gb
+#SBATCH --time=24:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+dates;hostname;pwd
+
+genome=${1}
+protein=${2}
+
+module load prothint/2.6.0
+
+prothint.py --threads ${SLURM_CPUS_ON_NODE:-1} ${genome} ${protein}
+########################################################################
+```
+3. run Braker2 with the protein database
+
+```
+[yimingweng@login5 braker2]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/lep_protein
+
+sbatch -J kely_braker2_protein kely_braker2_protein.slurm /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_repeat_mask/kely_final_repeatmasked.fasta /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/lep_protein/prothint_augustus.gff keiferia_lycopersicella
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=%x_%j
+#SBATCH --output=%x_%j.log
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mem-per-cpu=8gb
+#SBATCH --time=96:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=32
+dates;hostname;pwd
+
+genome=${1}
+protein_gff=${2}
+species=${3}
+
+module load conda
+module load braker/2.1.6
+
+braker.pl \
+--AUGUSTUS_CONFIG_PATH=/blue/kawahara/yimingweng/LepidoPhylo_Project/busco_out/Augustus/config \
+--genome=${genome} --species ${species} --hints=${protein_gff} --softmasking --gff3 --cores 32 --AUGUSTUS_ab_initio
+########################################################################
+```
+
+## **10/03/2022**  
+**\# genome annotation**  
+**\# BRAKER2** 
+
+The Braker annotation with protein database is done. Now use the RNA sequence as reference to rerun Braker and later I will have to merge the two result.
+
+1. download Tuta RNA sequence files (6 files for six different life stages)
+```
+[yimingweng@login6 RNA_seq_data]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/RNA_seq_data
+
+sbatch SRR_download.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=fastq_dump    # Job name
+#SBATCH --mail-type=END,FAIL          # Mail events (NONE, BEGIN, END, FAIL, ALL)
+#SBATCH --mail-user=yimingweng@ufl.edu     # Where to send mail
+#SBATCH --ntasks=1                    # Run on a single CPU
+#SBATCH --mem=2gb                     # Job memory request
+#SBATCH --time=04:00:00               # Time limit hrs:min:sec
+#SBATCH --output=fastq_dump.log   # Standard output and error log
+pwd; hostname; date
+
+module load sra/2.10.9
+fastq-dump --split-files --gzip SRR2147324 SRR2147322 SRR2147323 SRR2147321 SRR2147320 SRR2147319
+########################################################################
+```
+Note that the sample of SRR2147324 is single end read, not paired end read as the authors claimed in the paper.
+
+
+2. clean up the reads with [trimmomatic](http://www.usadellab.org/cms/?page=trimmomatic).
+
+```
+[yimingweng@login5 RNA_seq_data]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/RNA_seq_data
+
+sbatch -J kely_trimmomatic trimmomatic.slurm 
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=%x_%j
+#SBATCH --output=%x_%j.log
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mem-per-cpu=4gb
+#SBATCH --time=24:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+
+module load trimmomatic/0.39
+
+for sample in $(ls *fastq.gz | cut -d "_" -f 1 | sort | uniq)
+do
+    fq1=$(ls ${sample}_1*)
+    fq2=$(ls ${sample}_2*)
+    trimmomatic PE -threads 16 \
+    ${fq1} ${fq2} \
+    ${sample}_1_clean.fq.gz ${sample}_1_unpaired.fq.gz \
+    ${sample}_2_clean.fq.gz ${sample}_2_unpaired.fq.gz LEADING:3 TRAILING:3 MINLEN:36
+done
+########################################################################
+```
+Note that the single end sample "SRR2147324" needs to be run by itself because the code was written for paired end reads
+
+## **10/04/2022**  
+**\# genome annotation**  
+**\# BRAKER2** 
+
+With the clean RNA sequence data, now I am going to map these reads to the genome to create bam files. The bam files will be used as an input to braker2 to build the gene model. However, as I've mentioned above, <span style="color:red">  I am not very certain whether including the RNA sequence data from *Tuta* will improve or disprove the gene model)<span>.
+
+1. Map the reads to the genome assembly  <span style="color:red"> (Note: the fastq files had been deleted after I got the sorted bam files in step3) <span>.
+```
+[yimingweng@login5 mapped_bams]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/mapped_bams
+
+sbatch -J kely_hisat kely_hisat.slurm 
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=%x_%j
+#SBATCH --output=%x_%j.log
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mem-per-cpu=8gb
+#SBATCH --time=96:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=32
+
+module load hisat2/2.2.1-3n
+
+hisat2-build /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_final/kely_final_assembly.fasta /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_final/kely_final_assembly.fasta.base
+
+for sample in $(ls /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/RNA_seq_data/*fastq.gz | cut -d "_" -f 1,2,3,4,5,6,7 | sort | uniq)
+do
+    fq1=$(ls ${sample}_1_clean*)
+    fq2=$(ls ${sample}_2_clean*)
+    name=$(echo ${sample} | cut -d "/" -f 10 | cut -d "_" -f 1)
+    hisat2 -p 32 \
+    -x /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_final/kely_final_assembly.fasta.base \
+    -1 ${fq1} -2 ${fq2} -S ${name} --phred33 --novel-splicesite-outfile ${name}.junctions --rna-strandness FR
+done
+
+hisat2 -p 32 -x /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_final/kely_final_assembly.fasta.base \
+-U /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/RNA_seq_data/single_end/SRR2147324_1_clean.fq.gz \
+-S SRR2147324 --phred33 --novel-splicesite-outfile SRR2147324.junctions --rna-strandness F
+########################################################################
+```
+Note that the mapping rate is quite low, but I still have quite a bit of reads being mapped to Keiferia's genome
+```
+[yimingweng@login5 mapped_bams]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/mapped_bams
+
+for sam in $(ls SRR* | cut -d "." -f 1 | cut -d "_" -f 1 | sort | uniq)
+do
+    all=$(cat ${sam} | wc -l)
+    mapped=$(cat ${sam} | grep "ptg" | wc -l)
+    unmapped=$(cat ${sam} | grep \*$'\t'0$'\t0' | wc -l)
+    maprate=$(echo ${mapped}/${all} | bc -l)
+    unmaprate=$(echo ${unmapped}/${all} | bc -l)
+    echo -e "${sam}\t${all}\t${mapped}\t${maprate}\t${unmapped}\t${unmaprate}"
+done
+```
+| readname | read_count | mapped_read | mapped_rate | unmapped_read | unmapped_rate|
+| -------- | ---------- | ----------- | ----------- | ------------- | ------------ |
+SRR2147319   | 36017531 | 8323571 | 0.231  | 27693958 | 0.769 |
+SRR2147320   | 45016275 | 9279237 | 0.206  | 35737036 | 0.794 |
+SRR2147321   | 37705161 | 7111755 | 0.189 | 30593404  | 0.811 |
+SRR2147322   | 36685228 | 5577554 | 0.152 |  31107672 | 0.848 |
+SRR2147323   | 56770013 | 12247733| 0.216 |  44522278 | 0.784 |
+SRR2147324   | 19012633 | 2713121 | 0.143 |  16299512 | 0.857 |
+|
+2. Convert the same files to bam files (here I forgot to assign the extension for the outputs from hisat2 so the code looks funny). 
+
+```
+[yimingweng@login5 mapped_bams]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/mapped_bams
+
+sbatch -J sam2bam sam2bam.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=%x_%j
+#SBATCH --output=%x_%j.log
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mem-per-cpu=4gb
+#SBATCH --time=24:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+
+module load samtools/1.15
+
+for sam in $(ls SRR* | cut -d "." -f 1 | sort | uniq)
+do
+    samtools view --threads 16 -b -o ${sam}.bam ${sam}
+    samtools sort -m 7G -o ${sam}_sorted.bam -T ${sam}_temp --threads 16 ${sam}.bam
+done
+########################################################################
+```
+
+3. Remove redundant fastq, sam and bbam files (just keep the sorted bam files), and run braker with the sorted bam files.
+```
+[yimingweng@login5 tuta_RNA_seq]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq
+
+sbatch -J kely_braker2_RNA kely_braker2_RNA.slurm /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_repeat_mask/kely_final_repeatmasked.fasta keiferia_lycopersicella_RNA
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=%x_%j
+#SBATCH --output=%x_%j.log
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mem-per-cpu=8gb
+#SBATCH --time=96:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=32
+dates;hostname;pwd
+
+genome=${1}
+species=${2}
+
+module load conda
+module load braker/2.1.6
+
+braker.pl \
+--AUGUSTUS_CONFIG_PATH=/blue/kawahara/yimingweng/LepidoPhylo_Project/busco_out/Augustus/config \
+--genome=${genome} --species ${species} \
+--bam=/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/mapped_bams/SRR2147319_sorted.bam,/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/mapped_bams/SRR2147320_sorted.bam,/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/mapped_bams/SRR2147321_sorted.bam,/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/mapped_bams/SRR2147322_sorted.bam,/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/mapped_bams/SRR2147323_sorted.bam,/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/mapped_bams/SRR2147324_sorted.bam \
+--softmasking --gff3 --cores 32 --AUGUSTUS_ab_initio
+########################################################################
+
+```
+4. To evaluate the completeness of the gene model, I can run busco on the generated amino acid sequences. I will apply this approach to the models from 1) lepidoptera protein model, 2) Tuta RNA-sequence model, 3) combined model,and 4) combined model with Tuta transcriptome refining.
+- busco evaluation on gene model based on lepidoptera protein
+```
+[yimingweng@login5 lep_protein]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/lep_protein
+
+sbatch lep_protein_model_busco.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=Kely_lep_protein_gene_model_busco
+#SBATCH -o Kely_lep_protein_gene_model_busco.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 5:00:00
+#SBATCH -c 12
+
+# define configure file for BUSCO and augustus
+# For augustus, if encounter an authorization issue (error pops up when running busco), try to download the augustus repo and use its config dir
+export BUSCO_CONFIG_FILE="blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/config.ini"
+export AUGUSTUS_CONFIG_PATH="/blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/Augustus/config/"
+
+# load busco, make sure this is the latest version
+module load busco/5.3.0
+module load hmmer/3.2.1
+
+# run busco command
+busco -f -i /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/lep_protein/braker/augustus.hints.aa \
+ -o ./busco_out \
+ -l /data/reference/busco/v5/lineages/endopterygota_odb10 \
+ -m protein -c 12
+########################################################################
+# Result: C:95.4%[S:86.3%,D:9.1%],F:2.6%,M:2.0%,n:2124
+```
+- busco evaluation on gene model based on *Tuta* RNA sequences
+```
+[yimingweng@login5 tuta_RNA_seq]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq
+
+sbatch tuta_rna_model_busco.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=Kely_RNA_seq_gene_model_busco
+#SBATCH -o Kely_RNA_seq_gene_model_busco.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 5:00:00
+#SBATCH -c 12
+
+# define configure file for BUSCO and augustus
+# For augustus, if encounter an authorization issue (error pops up when running busco), try to download the augustus repo and use its config dir
+export BUSCO_CONFIG_FILE="blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/config.ini"
+export AUGUSTUS_CONFIG_PATH="/blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/Augustus/config/"
+
+# load busco, make sure this is the latest version
+module load busco/5.3.0
+module load hmmer/3.2.1
+
+# run busco command
+busco -f -i /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/braker/augustus.hints.aa \
+ -o ./busco_out \
+ -l /data/reference/busco/v5/lineages/endopterygota_odb10 \
+ -m protein -c 12
+########################################################################
+# Result: C:92.2%[S:86.1%,D:6.1%],F:4.2%,M:3.6%,n:2124
 ```
