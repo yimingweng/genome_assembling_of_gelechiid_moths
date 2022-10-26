@@ -1441,8 +1441,8 @@ mv kely_final_assembly.fasta.masked.masked.masked.masked kely_final_masked.fasta
 
 - track the number of softmasking nucleotide
 ```
-cat kely_repeatmasker_step3/kely_final_assembly.fasta.masked.masked.masked | grep -v ">" | grep [a-z] | wc -c
-214171224
+cat kely_repeatmasker_step3/kely_final_assembly.fasta.masked.masked.masked | grep -v ">" | tr -dc a-z | wc -c
+
 ```
 
 - store the final masked genome in the assembly folder (`/blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_repeat_mask/`)
@@ -1658,7 +1658,7 @@ SRR2147322   | 36685228 | 5577554 | 0.152 |  31107672 | 0.848 |
 SRR2147323   | 56770013 | 12247733| 0.216 |  44522278 | 0.784 |
 SRR2147324   | 19012633 | 2713121 | 0.143 |  16299512 | 0.857 |
 |
-2. Convert the same files to bam files (here I forgot to assign the extension for the outputs from hisat2 so the code looks funny). 
+2. Convert the sam files to bam files (here I forgot to assign the extension for the outputs from hisat2 so the code looks funny). 
 
 ```
 [yimingweng@login5 mapped_bams]$ pwd
@@ -1687,7 +1687,7 @@ done
 ########################################################################
 ```
 
-3. Remove redundant fastq, sam and bbam files (just keep the sorted bam files), and run braker with the sorted bam files.
+3. Remove redundant fastq, sam and bam files (just keep the sorted bam files), and run braker with the sorted bam files.
 ```
 [yimingweng@login5 tuta_RNA_seq]$ pwd
 /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq
@@ -1790,4 +1790,252 @@ busco -f -i /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tut
  -m protein -c 12
 ########################################################################
 # Result: C:92.2%[S:86.1%,D:6.1%],F:4.2%,M:3.6%,n:2124
+```
+
+## **10/04/2022**  
+**\# TSEBRA**  
+
+With the two lines of external evidence for gene prediction, we can integrate those outputs (predictions from protein database and RNAseq reads) to get the final gene prediction model using [TSEBRA](https://github.com/Gaius-Augustus/TSEBRA). 
+
+```
+[yimingweng@login1 tsebra]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tsebra
+
+sbatch Kely_TSEBRA.slurm
+
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=Kely_TSEBRA
+#SBATCH -o Kely_TSEBRA.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 24:00:00
+#SBATCH -c 24
+
+module load python3
+
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tsebra/TSEBRA/bin/tsebra.py \
+--keep_gtf /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/lep_protein/braker/augustus.hints.gtf,/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/braker/augustus.hints.gtf \
+-c /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tsebra/kely_tsebra.cfg \
+-e /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/lep_protein/braker/hintsfile.gff,/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/braker/hintsfile.gff \
+-o kely_protein_rnaseq_conbine.gtf
+
+
+/blue/kawahara/yimingweng/universal_scripts/Augustus/scripts/gtf2aa.pl \
+/blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_repeat_mask/kely_final_repeatmasked.fasta \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tsebra/kely_protein_rnaseq_conbine.gtf \
+kely_braker_final_aa.fa
+########################################################################
+```
+
+- busco evaluation on the final merged gene model from TSEBRA
+```
+[yimingweng@login5 tuta_RNA_seq]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tsebra
+
+sbatch braker_final_model_busco.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=braker_final_model_busco
+#SBATCH -o braker_final_model_busco.slurm.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 10:00:00
+#SBATCH -c 12
+
+# define configure file for BUSCO and augustus
+# For augustus, if encounter an authorization issue (error pops up when running busco), try to download the augustus repo and use its config dir
+export BUSCO_CONFIG_FILE="blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/config.ini"
+export AUGUSTUS_CONFIG_PATH="/blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/Augustus/config/"
+
+# load busco, make sure this is the latest version
+module load busco/5.3.0
+module load hmmer/3.2.1
+
+# run busco command
+busco -f -i /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tsebra/kely_braker_final_aa.fa \
+ -o ./busco_out \
+ -l /data/reference/busco/v5/lineages/lepidoptera_odb10 \
+ -m protein -c 12
+########################################################################
+# Result: C:81.0%[S:75.1%,D:5.9%],F:4.5%,M:14.5%,n:2124
+```
+The results don't show any improvement based on the BUSCO completeness. I have issued this to TSEBRA [here](https://github.com/Gaius-Augustus/TSEBRA/issues/23) and it seems that there are a lot of transcripts that aren't supported by hints from the extrinsic evidence so they have been filtered out by TSEBRA. So I am going to try two things:
+1. take the suggestions from the author (replied in the issue), to run the tsebra with `--keep_gtf` for the protein prediction and `--gtf` for the RNA-seq prediction, plus to tune the parameter `intron_support` to 0.5 to allow more transcripts with low evidence support to pass the filter.
+
+```
+[yimingweng@login1 tsebra]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tsebra
+
+sbatch Kely_TSEBRA_2.slurm
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=Kely_TSEBRA2
+#SBATCH -o Kely_TSEBRA2.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 24:00:00
+#SBATCH -c 24
+
+module load python3
+
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tsebra/TSEBRA/bin/tsebra.py \
+--keep_gtf /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/lep_protein/braker/augustus.hints.gtf \
+--gtf /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/braker/augustus.hints.gtf \
+-c /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tsebra/kely_tsebra2.cfg \
+-e /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/lep_protein/braker/hintsfile.gff,/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tuta_RNA_seq/braker/hintsfile.gff \
+-o kely_tsebra2.gtf
+
+
+/blue/kawahara/yimingweng/universal_scripts/Augustus/scripts/gtf2aa.pl \
+/blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_repeat_mask/kely_final_repeatmasked.fasta \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/tsebra/kely_tsebra2.gtf \
+kely_braker_tsebra2_aa.fa
+########################################################################
+# Result: C:95.7%[S:79.0%,D:16.7%],F:2.4%,M:1.9%,n:2124
+```
+The busco duplication is still high. This is very likely due to the presence of isoforms. For the following busco evaluation, I should use the updated busco script to run the busco for the gene model. And here are the conclusion and concerns that lead to next step:
+- conclusion: for Keiferia genome, the use of Tuta RNAseq read only marginally increase the number of predicted gene, but introduced large number of noise (likely false predicted genes), which can be seen by the boosting duplication rate ( 9% -> 16% )
+- concern: both prohint and comnined models (prohint+RNAseq) have predicted too many protein coding genes. The general number of coding genes in Lepidotera is ~15k to 18k. But the prohint and combined model has 36k and 42k genes. With the most strict parameters applied to the tsebra to get the most conserved model, I still get 26k genes with low busco completeness (C:81.0%[S:75.1%,D:5.9%],F:4.5%,M:14.5%). I will need to fix this problem to create a proper gene model.  
+<br />
+
+
+## **10/22/2022** 
+There is an issue addressed in the braker github, talking about the problem of having too many genes from braker2. Here is the [link](https://github.com/Gaius-Augustus/BRAKER/issues/319) to it. The author suggested to use their scripts to select the genes only fully, or at least partially supported by the hints. The final model will then be the subset of the total output of braker containing only the higher confident genes. To simplified the steps, I merged all the necessary steps into one slurm scripts called **braker_noRNA_anaotation.slurm**. These steps are:
+1. take the repeat-masked genome as input, and run prohints to create protein database called prothint.gff
+2. use the prohints database to run braker, of course without the RNAseq, to predict the gene model.
+3. use "selectSupportedSubsets.py" to extract the genes with full or partial support from the hints, and write it to a new gtf file called "supported_gene.gtf"
+4. Use supported_gene.gtf to generate a new protein fasta file called "braker_supported_gene.aa"
+5. To run busco without presence of isoform, further subset the braker_supported_gene.aa to a temporal fasta file (will be removed after the process finished) and this temporal fasta will be used to evaluate the completeness of the genome model with only the longest unique isoforms. That means the duplication from this busco result can not be referred to the presence of isoform.
+
+```
+
+sbatch -J kely_noRNA_model2 braker_noRNA_anaotation2.slurm /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_repeat_mask/kely_final_assembly_softmasked.fasta kely_rerun2
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=%x_%j
+#SBATCH --output=%x_%j.log
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mem-per-cpu=4gb
+#SBATCH --time=48:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=32
+dates;hostname;pwd
+
+genome=${1} # the masked genome
+species=${2} # the species name without space (use underscore)
+
+module load prothint/2.6.0
+module load braker/2.1.6
+module load busco/5.3.0
+module load hmmer/3.2.1
+
+export BUSCO_CONFIG_FILE="blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/config.ini"
+export AUGUSTUS_CONFIG_PATH="/blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/Augustus/config/"
+
+# step1: run prohints to create protein database called prothint.gff
+prothint.py --threads ${SLURM_CPUS_ON_NODE:-1} ${genome} /blue/kawahara/yimingweng/universal_scripts/proteins.fasta
+
+# step2: use prothint_augustus.gff  to run braker
+braker.pl \
+--AUGUSTUS_CONFIG_PATH=/blue/kawahara/yimingweng/LepidoPhylo_Project/busco_out/Augustus/config \
+--genome=${genome} --species ${species} --hints=prothint_augustus.gff --softmasking --gff3 --cores 32 --AUGUSTUS_ab_initio
+
+# step 3: extract the genes with full or partial support from the hints
+python3 /blue/kawahara/yimingweng/universal_scripts/selectSupportedSubsets.py ./braker/augustus.hints.gtf ./braker/hintsfile.gff --fullSupport fullsupport.gff --anySupport ${species}_prohint_braker_final.gff --noSupport nosupport.gff
+
+# step 4: supported_gene.gtf to generate final gene model fasta called "braker_supported_gene.aa"
+/blue/kawahara/yimingweng/universal_scripts/Augustus/scripts/gtf2aa.pl ${genome} ${species}_prohint_braker_final.gff ${species}_anysupport_aa.fa
+
+# step5: run busco on the subset of the final model (remove smaller isofor)
+python3 /blue/kawahara/yimingweng/universal_scripts/longest_aa.py < ${species}_anysupport_aa.fa > ${species}_tmp.fasta
+
+busco -f -i ${species}_tmp.fasta \
+ -o ./${species}_gene_model_busco_out \
+ -l /data/reference/busco/v5/lineages/lepidoptera_odb10 \
+ -m protein -c 32
+
+rm ${species}_tmp.fasta
+########################################################################
+# BUSCO result: C:92.9%[S:91.5%,D:1.4%],F:0.8%,M:6.3%,n:5286
+```
+
+## **10/25/2022**  
+**\# functional annotation**  
+**\# diamond**  
+**\# RefSeq non-redundant protein database**  
+Because the transcriptome assembly from *Tuta* is not available, I will have to skip PASA gene model refining work and move forward to do functional annotation. To do the functional annotation, I will use [diamond](https://github.com/bbuchfink/diamond), [InterProScan](https://github.com/ebi-pf-team/interproscan), and [InterPro](https://www.ebi.ac.uk/interpro/).
+
+Let's start with diamond, I will do this work following the [tutorial](https://github.com/bbuchfink/diamond/wiki/1.-Tutorial) on its GitHub Wiki. Because diamond will use blastp to annotate the protein sequence from the output of braker2, I will first create the binary diamond database for blasting, then use this database in dnmd format for blasting. These step are written into a single script called "diamond.slurm". And it takes four arguments:  
+1. database for blast in fasta or dnmd format
+2. protein sequences of the gene model from braker2 in fasta format
+3. the e-value cutoff, usually 1*e-5
+4. the output prefix for saving the tsv file  
+
+**Let start blast the protein to the databases:**  
+1. The RefSeq non-redundant proteins. This is a huge database containing all the proteins from specific group.
+- I use `wget` to get it and it needs to be `gunzip` before use:
+```
+[yimingweng@login1 diamond]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/diamond
+wget "ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz"
+```
+- Run diamond to get the functional annotation from the nr database.
+```
+[yimingweng@login1 diamond]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/diamond
+
+sbatch -J kely_nr /blue/kawahara/yimingweng/universal_scripts/diamond.slurm /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/diamond/nr.dmnd /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/kely_noRNA_model/kely_rerun2_anysupport_aa.fa 0.00001 kely_nr_k5_1e5
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=kely_diamond
+#SBATCH -o kely_diamond.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=8gb
+#SBATCH -t 48:00:00
+#SBATCH -c 24
+
+module load diamond/2.0.9
+
+# example
+
+database=${1} # full path to the database in dmnd format, the diamond will use it to find the function for the querying gene model
+gene_model=${2} # gene model for functional annotation in fasta format
+cutoff=${3}
+outname=${4}
+path=$(echo ${database} | rev | cut -d "/" -f 2- | rev)
+database_name=$(echo ${database} | rev | cut -d "/" -f 1 | rev | cut -d "." -f 1)
+dmnd=$(ls ${path}/${database_name}.dmnd)
+
+if [ -z "${dmnd}" ]
+then
+  echo "converting database from fasta to dmnd format"
+  diamond makedb --in ${database} -d nr
+else
+  echo -e "the database has been converted to dmnd format, skip this step and run diamond"
+  diamond blastp -k5 -e ${cutoff} -d nr.dmnd -q ${gene_model} -o ${outname}.tsv
+fi
+########################################################################
+```
+
+2. The uniprot arthropod database (Reviewed Swiss-Prot for arthropod)
+```
+[yimingweng@login1 diamond]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/diamond
+
+sbatch -J kely_uniprot /blue/kawahara/yimingweng/universal_scripts/diamond.slurm /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/diamond/uniprot_arthropod.dmnd /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/kely_noRNA_model/kely_rerun2_anysupport_aa.fa 0.00001 kely_uniprot_k5_1e5
 ```
