@@ -134,7 +134,7 @@ kmc -k21 SRR15658214.fastq.gz 21mers kmc_test
 
 # Create text dump from KMC database binary format
 kmc_tools transform 21mers dump 21mers.txt
-
+minimap2
 # remove the temporal directory
 rm -r kmc_test
 ###########################################################
@@ -721,7 +721,7 @@ module load libssl/1.0.2l
 purge_haplotigs purge  \
 -g /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam_default.fasta  \
 -c /blue/kawahara/yimingweng/Kely_genome_project/purging/coverage_stats.csv \
--o Kely_purge_15X_120X
+-o Kely_purge_5X_120X
 ########################################################################
 ```
 
@@ -729,10 +729,10 @@ purge_haplotigs purge  \
 
 4. Rerun BUSCO on the purged genome.
 ```
-[yimingweng@login6 Kely_purge_15X_120X]$ pwd
-/blue/kawahara/yimingweng/Kely_genome_project/busco/Kely_purge_15X_120X
+[yimingweng@login6 Kely_purge_5X_120X]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/busco/Kely_purge_5X_120X
 
-sbatch universal_run_busco.slurm /blue/kawahara/yimingweng/Kely_genome_project/purging/Kely_purge_15X_120X.fasta Kely_purge_15X_120X
+sbatch universal_run_busco.slurm /blue/kawahara/yimingweng/Kely_genome_project/purging/Kely_purge_5X_120X.fasta Kely_purge_5X_120X
 
 ###########################  script content  ###########################
 #!/bin/bash
@@ -826,7 +826,7 @@ module load ncbi_blast/2.10.1
 
 blastn \
 -task megablast \
--query /blue/kawahara/yimingweng/Kely_genome_project/purging/Kely_purge_15X_120X.fasta \
+-query /blue/kawahara/yimingweng/Kely_genome_project/purging/Kely_purge_5X_120X.fasta \
 -db nt \
 -outfmt '6 qseqid staxids bitscore std' \
 -max_target_seqs 1 \
@@ -863,7 +863,7 @@ sbatch kely_minimap_purge.slurm
 module load minimap/2.21
 module load samtools/1.15
 
-minimap2 -t 8 -ax map-pb /blue/kawahara/yimingweng/Kely_genome_project/purging/Kely_purge_15X_120X.fasta \
+minimap2 -t 8 -ax map-pb /blue/kawahara/yimingweng/Kely_genome_project/purging/Kely_purge_5X_120X.fasta \
 /blue/kawahara/yimingweng/Kely_genome_project/raw_reads/Keiferia_lycopersicella_ccs.fastq.gz \
 --secondary=no \
 | samtools sort -m 1G -o purging_aligned.bam -T tmp.ali
@@ -895,7 +895,7 @@ module load blobtools/2.2
 
 # create blobDB
 blobtools create \
---fasta /blue/kawahara/yimingweng/Kely_genome_project/purging/Kely_purge_15X_120X.fasta \
+--fasta /blue/kawahara/yimingweng/Kely_genome_project/purging/Kely_purge_5X_120X.fasta \
 --cov /blue/kawahara/yimingweng/Kely_genome_project/blobplot/purging_aligned.bam \
 Kely_purge_DB
 
@@ -1110,7 +1110,7 @@ ggplot(contig_dat, aes(x=gc, y=log(aligned_cov), size=length, col=bestsumorder_p
 
 ```
 [yimingweng@login5 run_endopterygota_odb10]$ pwd
-/blue/kawahara/yimingweng/Kely_genome_project/busco/Kely_purge_15X_120X/Kely_purge_15X_120X/run_endopterygota_odb10
+/blue/kawahara/yimingweng/Kely_genome_project/busco/Kely_purge_5X_120X/Kely_purge_5X_120X/run_endopterygota_odb10
 
 [yimingweng@login5 run_endopterygota_odb10]$ cat full_table.tsv | grep "ptg000079l"
 # not thing has returned, ther is no busco genes related to this contig
@@ -1122,7 +1122,7 @@ ggplot(contig_dat, aes(x=gc, y=log(aligned_cov), size=length, col=bestsumorder_p
 [yimingweng@login5 kely_final]$ pwd
 /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_final
 
-sed -e '/ptg000079l/,+1d' /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_purging/Kely_purge_15X_120X.fasta > kely_final_assembly.fasta
+sed -e '/ptg000079l/,+1d' /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_purging/Kely_purge_5X_120X.fasta > kely_final_assembly.fasta
 
 cat /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_hifisam_default/Kely_hifisam_default.fasta | grep -A1  "ptg000073c" > kely_mito_genome.fasta
 ```
@@ -1975,7 +1975,7 @@ rm ${species}_tmp.fasta
 **\# functional annotation**  
 **\# diamond**  
 **\# RefSeq non-redundant protein database**  
-Because the transcriptome assembly from *Tuta* is not available, I will have to skip PASA gene model refining work and move forward to do functional annotation. To do the functional annotation, I will use [diamond](https://github.com/bbuchfink/diamond), [InterProScan](https://github.com/ebi-pf-team/interproscan), and [InterPro](https://www.ebi.ac.uk/interpro/).
+Because the transcriptome assembly from *Tuta* is not available, I will have to skip PASA gene model refining work and move forward to do functional annotation. To do the functional annotation, I will use [diamond](https://github.com/bbuchfink/diamond), [InterProScan](https://github.com/ebi-pf-team/interproscan), based on the database [InterPro](https://www.ebi.ac.uk/interpro/).
 
 Let's start with diamond, I will do this work following the [tutorial](https://github.com/bbuchfink/diamond/wiki/1.-Tutorial) on its GitHub Wiki. Because diamond will use blastp to annotate the protein sequence from the output of braker2, I will first create the binary diamond database for blasting, then use this database in dnmd format for blasting. These step are written into a single script called "diamond.slurm". And it takes four arguments:  
 1. database for blast in fasta or dnmd format
@@ -1991,7 +1991,7 @@ Let's start with diamond, I will do this work following the [tutorial](https://g
 /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/diamond
 wget "ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/nr.gz"
 ```
-- Run diamond to get the functional annotation from the nr database.
+- Run diamond to get the functional annotation from the nr database. <span style="color:red"> Note: this script has been updated, see script written on 10/27/2022. </span>
 ```
 [yimingweng@login1 diamond]$ pwd
 /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/diamond
@@ -2027,15 +2027,109 @@ then
   diamond makedb --in ${database} -d nr
 else
   echo -e "the database has been converted to dmnd format, skip this step and run diamond"
-  diamond blastp -k5 -e ${cutoff} -d nr.dmnd -q ${gene_model} -o ${outname}.tsv
+  diamond blastp -k5 -e ${cutoff} -d ${database} -q ${gene_model} -o ${outname}.tsv
 fi
 ########################################################################
 ```
 
-2. The uniprot arthropod database (Reviewed Swiss-Prot for arthropod)
+2. The uniprot arthropod database (Reviewed Swiss-Prot for arthropod)  <span style="color:red"> Note: this script has been updated, see script written on 10/27/2022. </span>
 ```
 [yimingweng@login1 diamond]$ pwd
 /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/diamond
 
 sbatch -J kely_uniprot /blue/kawahara/yimingweng/universal_scripts/diamond.slurm /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/diamond/uniprot_arthropod.dmnd /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/kely_noRNA_model/kely_rerun2_anysupport_aa.fa 0.00001 kely_uniprot_k5_1e5
 ```
+
+## **10/27/2022**  
+
+The outputs from Diamond are in pretty good shape but the standard annotation format is usually gtf or gff3, so I would like to convert them to gff3 format using the python script called `blast2gff.py` from [genomeGTFtools](https://github.com/wrf/genomeGTFtools). I have put this step into the diamond slurm script.
+
+
+## **11/02/2022** 
+**\# functional annotation**  
+**\# InterProScan**  
+
+1. Usually we annotate functions for a gene model we want multiple lines of evidence. Here I am going to use [InterProScan](https://interproscan-docs.readthedocs.io/en/latest/index.html) to annotate the genes
+
+```
+[yimingweng@login5 interproscan]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/functional_annotation/interproscan
+
+sbatch -J kely_interproscan /blue/kawahara/yimingweng/universal_scripts/interproscan.slurm /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/kely_noRNA_model/kely_rerun2_anysupport_aa.fa kely_interproscan
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=%x_interproscan_%j
+#SBATCH -o %x_interproscan_%j.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=8gb
+#SBATCH -t 120:00:00
+#SBATCH -c 32
+
+module load iprscan/5.57
+
+protein=${1}
+prefix=${2}
+
+cat ${protein} | sed 's/\*//g' > ${prefix}.fasta
+interproscan.sh -i ${prefix}.fasta -cpu 32 -f tsv -goterms
+########################################################################
+```
+
+## **11/04/2022** 
+**\# Orthofinder** 
+
+```
+[yimingweng@login5 orthofinder]$ pwd
+/blue/kawahara/yimingweng/gele_genomes_analyses/orthofinder
+
+sbatch -J gele /blue/kawahara/yimingweng/universal_scripts/orthofinder.slurm /blue/kawahara/yimingweng/gele_genomes_analyses/orthofinder/input_aa
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=%x_orthofinder_%j
+#SBATCH -o %x_orthofinder_%j.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=8gb
+#SBATCH -t 96:00:00
+#SBATCH -c 32
+#SBATCH --pos=kawahara-b
+
+module load orthofinder/2.5.2
+
+input=${1} # input folder with all amino acid sequences of species we want to include
+
+orthofinder -f ${input}
+###########################  script content  ###########################
+```
+
+
+
+
+
+
+
+
+
+
+<br />  
+<br /> 
+<br />  
+<br />  
+<br />  
+<br />  
+<br />  
+<br />  
+<br />  
+<br />  
+<br />  
+<br />  
+
+
+### Path change/File moving notes
+- 10/28/2022: the file `nr.dmnd` was in `/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/diamond` before and now is in `/orange/kawahara/yimingweng/databases/`
+- 10/28/2022: the file `uniprot_arthropod.dmnd ` was in `/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/diamond` before and now is in `/orange/kawahara/yimingweng/databases/`
