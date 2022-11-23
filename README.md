@@ -236,13 +236,23 @@ sbatch -J kely_uniprot /blue/kawahara/yimingweng/universal_scripts/diamond.slurm
 ```
 
 3. Usually we annotate functions for a gene model we want multiple lines of evidence. Here I am going to use [InterProScan](https://interproscan-docs.readthedocs.io/en/latest/index.html) to annotate the genes. The script called `interproscan.slurm` is in the scripts folder.
-
 ```
 [yimingweng@login5 interproscan]$ pwd
 /blue/kawahara/yimingweng/Kely_genome_project/functional_annotation/interproscan
 
 sbatch -J kely_interproscan /blue/kawahara/yimingweng/universal_scripts/interproscan.slurm /blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/kely_noRNA_model/kely_rerun2_anysupport_aa.fa kely_interproscan
 ```
+
+4. additional annotation with [hmmer](http://hmmer.org/)
+```
+sbatch -J kely /blue/kawahara/yimingweng/universal_scripts/hmmer.slurm \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/prothint/kely_anysupport_aa.fa \
+kely
+```
+
+5. To annotate the protein sequences with GO terms, I used the [pannzer2](http://ekhidna2.biocenter.helsinki.fi/sanspanz/).
+
+6. The protein sequences can also be annotated with the gene function with the pathway it's involved. I use [KAAS](https://www.genome.jp/kegg/kaas/), the annotator for KEGG database. 
 
 <br />
 
@@ -289,3 +299,9 @@ Plos Biology. 19(12):e3001464 (2021)
 Matthias Blum, Hsin-Yu Chang, Sara Chuguransky, Tiago Grego, Swaathi Kandasaamy, Alex Mitchell, Gift Nuka, Typhaine Paysan-Lafosse, Matloob Qureshi, Shriya Raj, Lorna Richardson, Gustavo A Salazar, Lowri Williams, Peer Bork, Alan Bridge, Julian Gough, Daniel H Haft, Ivica Letunic, Aron Marchler-Bauer, Huaiyu Mi, Darren A Natale, Marco Necci, Christine A Orengo, Arun P Pandurangan, Catherine Rivoire, Christian J A Sigrist, Ian Sillitoe, Narmada Thanki, Paul D Thomas, Silvio C E Tosatto, Cathy H Wu, Alex Bateman, Robert D Finn Nucleic Acids Research (2020), gkaa977, PMID: 33156333
 
 Philip Jones, David Binns, Hsin-Yu Chang, Matthew Fraser, Weizhong Li, Craig McAnulla, Hamish McWilliam, John Maslen, Alex Mitchell, Gift Nuka, Sebastien Pesseat, Antony F. Quinn, Amaia Sangrador-Vegas, Maxim Scheremetjew, Siew-Yit Yong, Rodrigo Lopez, Sarah Hunter Bioinformatics (2014), PMID: 24451626
+
+[HMMER](http://hmmer.org/): biosequence analysis using profile hidden Markov models
+
+Törönen P, Medlar A, Holm L. PANNZER2: a rapid functional annotation web server. Nucleic Acids Res. 2018 Jul 2;46(W1):W84-W88. doi: 10.1093/nar/gky350. PMID: 29741643; PMCID: PMC6031051.
+
+Moriya, Y., Itoh, M., Okuda, S., Yoshizawa, A., and Kanehisa, M.; KAAS: an automatic genome annotation and pathway reconstruction server. Nucleic Acids Res. 35, W182-W185 (2007).

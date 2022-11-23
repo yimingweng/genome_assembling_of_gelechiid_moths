@@ -1919,7 +1919,7 @@ There is an issue addressed in the braker github, talking about the problem of h
 
 ```
 
-sbatch -J kely_noRNA_model2 braker_noRNA_anaotation2.slurm /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_repeat_mask/kely_final_assembly_softmasked.fasta kely_rerun2
+sbatch -J kely_noRNA braker_noRNA_anaotation.slurm /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_repeat_mask/kely_final_assembly_softmasked.fasta kely3
 
 ###########################  script content  ###########################
 #!/bin/bash
@@ -1931,7 +1931,6 @@ sbatch -J kely_noRNA_model2 braker_noRNA_anaotation2.slurm /blue/kawahara/yiming
 #SBATCH --time=48:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
-dates;hostname;pwd
 
 genome=${1} # the masked genome
 species=${2} # the species name without space (use underscore)
@@ -1940,6 +1939,7 @@ module load prothint/2.6.0
 module load braker/2.1.6
 module load busco/5.3.0
 module load hmmer/3.2.1
+module load diamond/2.0.9
 
 export BUSCO_CONFIG_FILE="blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/config.ini"
 export AUGUSTUS_CONFIG_PATH="/blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/Augustus/config/"
@@ -1947,26 +1947,37 @@ export AUGUSTUS_CONFIG_PATH="/blue/kawahara/yimingweng/Kely_genome_project/busco
 # step1: run prohints to create protein database called prothint.gff
 prothint.py --threads ${SLURM_CPUS_ON_NODE:-1} ${genome} /blue/kawahara/yimingweng/universal_scripts/proteins.fasta
 
-# step2: use prothint_augustus.gff  to run braker
+# step2: use prothint_augustus.gff to run braker
 braker.pl \
 --AUGUSTUS_CONFIG_PATH=/blue/kawahara/yimingweng/LepidoPhylo_Project/busco_out/Augustus/config \
 --genome=${genome} --species ${species} --hints=prothint_augustus.gff --softmasking --gff3 --cores 32 --AUGUSTUS_ab_initio
 
 # step 3: extract the genes with full or partial support from the hints
-python3 /blue/kawahara/yimingweng/universal_scripts/selectSupportedSubsets.py ./braker/augustus.hints.gtf ./braker/hintsfile.gff --fullSupport fullsupport.gff --anySupport ${species}_prohint_braker_final.gff --noSupport nosupport.gff
+python3 /blue/kawahara/yimingweng/universal_scripts/selectSupportedSubsets.py ./braker/augustus.hints.gtf ./braker/hintsfile.gff --fullSupport fullsupport.gff --anySupport ${species}_anysupport.gff --noSupport nosupport.gff
 
-# step 4: supported_gene.gtf to generate final gene model fasta called "braker_supported_gene.aa"
-/blue/kawahara/yimingweng/universal_scripts/Augustus/scripts/gtf2aa.pl ${genome} ${species}_prohint_braker_final.gff ${species}_anysupport_aa.fa
+# step 4: rescure genes from the non-support gff
+/blue/kawahara/yimingweng/universal_scripts/Augustus/scripts/gtf2aa.pl ${genome} nosupport.gff ${species}_nosupport_aa.fa
+diamond blastp -k5 -e 0.00001 -d /orange/kawahara/yimingweng/databases/nr.dmnd -q ${species}_nosupport_aa.fa -f 6 -o nosupport_nr.tsv
+diamond blastp -k5 -e 0.00001 -d /orange/kawahara/yimingweng/databases/uniprot_arthropod.dmnd -q ${species}_nosupport_aa.fa -f 6 -o nosupport_uniprot.tsv
+cat nosupport_nr.tsv nosupport_uniprot.tsv | cut -d $'\t' -f 1 | sort | uniq >> rescure_list
+cat ${species}_anySupport.gff | cut -d $'\t' -f 9 | cut -d " " -f 4 | grep -o  "[A-Za-z]_[0-9]*" | sort | uniq >> rescure_list
+sort -t "g" -k2,2 -n rescure_list >> rescure_list_sort
+rm rescure_list
+IFS=$'\n'
+for gene in $(cat rescure_list_sort); do cat ./braker/augustus.hints.gtf | grep -Pw ${gene} >> ${species}_braker_final.gtf; done
 
-# step5: run busco on the subset of the final model (remove smaller isofor)
-python3 /blue/kawahara/yimingweng/universal_scripts/longest_aa.py < ${species}_anysupport_aa.fa > ${species}_tmp.fasta
+# step 5: use braker_final.gtf to generate final protein fasta called "braker_final_gene.aa"
+/blue/kawahara/yimingweng/universal_scripts/Augustus/scripts/gtf2aa.pl ${genome} ${species}_braker_final.gtf ${species}_braker_final_gene.aa
+
+# step 6: run busco on the subset of the final model (remove smaller isoform)
+python3 /blue/kawahara/yimingweng/universal_scripts/longest_aa.py < ${species}_braker_final_gene.aa > ${species}_tmp.fasta
 
 busco -f -i ${species}_tmp.fasta \
  -o ./${species}_gene_model_busco_out \
  -l /data/reference/busco/v5/lineages/lepidoptera_odb10 \
  -m protein -c 32
 
-rm ${species}_tmp.fasta
+rm ${species}_tmp.fasta ${species}_nosupport_aa.fa
 ########################################################################
 # BUSCO result: C:92.9%[S:91.5%,D:1.4%],F:0.8%,M:6.3%,n:5286
 ```
@@ -2074,7 +2085,7 @@ protein=${1}
 prefix=${2}
 
 cat ${protein} | sed 's/\*//g' > ${prefix}.fasta
-interproscan.sh -i ${prefix}.fasta -cpu 32 -f tsv -goterms
+interproscan.sh -i ${prefix}.fasta -cpu 32 -f tsv -f XML -goterms
 ########################################################################
 ```
 
@@ -2109,27 +2120,253 @@ orthofinder -f ${input}
 
 
 
+## **11/16/2022**
+**\# braker2 rerun**  
+I found that the previous code running braker2 did not predict UTRs. So I am rerunning the braker pipeline with `--UTR=on` back to the braker.pl argument. Note that I have cleaned up the annotation folder and created a new directory called `prothint`in `/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/`.
+```
+[yimingweng@login1 prothint]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/prothint
+
+sbatch -J kely /blue/kawahara/yimingweng/universal_scripts/braker_prothint.slurm /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_repeat_mask/kely_final_assembly_softmasked.fasta kely
+
+###########################  script content  ###########################
+#!/bin/bash
+#SBATCH --job-name=%x_braker_prothint_%j
+#SBATCH --output=%x_braker_prothint_%j.log
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mem-per-cpu=4gb
+#SBATCH --time=96:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=32
+dates;hostname;pwd
+
+genome=${1} # the masked genome
+species=${2} # the species name without space (use underscore)
+
+module load prothint/2.6.0
+module load braker/2.1.6
+module load busco/5.3.0
+module load hmmer/3.2.1
+
+export BUSCO_CONFIG_FILE="blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/config.ini"
+export AUGUSTUS_CONFIG_PATH="/blue/kawahara/yimingweng/Kely_genome_project/busco/kely_hifisam_default/Augustus/config/"
+
+# step1: run prohints to create protein database called prothint.gff
+prothint.py --threads ${SLURM_CPUS_ON_NODE:-1} ${genome} /blue/kawahara/yimingweng/universal_scripts/proteins.fasta
+
+# step2: use prothint_augustus.gff  to run braker
+braker.pl \
+--AUGUSTUS_CONFIG_PATH=/blue/kawahara/yimingweng/LepidoPhylo_Project/busco_out/Augustus/config \
+--genome=${genome} --species ${species} --hints=prothint_augustus.gff --softmasking --gff3 --cores 32 --AUGUSTUS_ab_initio
+
+# step 3: extract the genes with full or partial support from the hints
+python3 /blue/kawahara/yimingweng/universal_scripts/selectSupportedSubsets.py ./braker/augustus.hints.gtf ./braker/hintsfile.gff --fullSupport fullsupport.gff --anySupport ${species}_prohint_braker_final.gff --noSupport nosupport.gff
+
+# step 4: supported_gene.gtf to generate final gene model fasta called "braker_supported_gene.aa"
+/blue/kawahara/yimingweng/universal_scripts/Augustus/scripts/gtf2aa.pl ${genome} ${species}_prohint_braker_final.gff ${species}_anysupport_aa.fa
+
+# step 5: run busco on the subset of the final model (remove smaller isofor)
+python3 /blue/kawahara/yimingweng/universal_scripts/longest_aa.py < ${species}_anysupport_aa.fa > ${species}_tmp.fasta
+
+busco -f -i ${species}_tmp.fasta \
+ -o ./${species}_gene_model_busco_out \
+ -l /data/reference/busco/v5/lineages/lepidoptera_odb10 \
+ -m protein -c 32
+
+rm ${species}_tmp.fasta
+
+# step 6: get the final gft 
+cat ${species}_prohint_braker_final.gff | cut -d $'\t' -f 9 | cut -d " " -f 2 | cut -d "\"" -f 2 | grep -v "#" | sort -t "g" -k2,2 -n | uniq >> transcript_list
+touch ${species}_prohint_braker_final.gtf
+IFS=$'\n'
+for transcript in $(cat transcript_list)
+do
+    gene=$(echo ${transcript} | cut -d "." -f 1)
+    gene_line=$(cat ./braker/augustus.hints.gtf | grep -Pw "gene" | grep -Pw "${gene}")
+    match=$(cat ${species}_prohint_braker_final.gtf | grep -Pw "gene" | grep -Pw "${gene}")
+    if [[ -z ${match} ]]
+    then
+        echo ${gene_line} >> ${species}_prohint_braker_final.gtf
+    else
+        echo "gene is already in the gft, skip"
+    fi
+    cat ./braker/augustus.hints.gtf | grep -Pw "${transcript}" >> ${species}_prohint_braker_final.gtf
+done
+########################################################################
+# Original BUSCO without removing unsupported gene: C:96.2%[S:85.9%,D:10.3%],F:0.8%,M:3.0%,n:5286
+# BUSCO result: C:93.2%[S:91.7%,D:1.5%],F:0.7%,M:6.1%,n:5286
+# 13841 genes; 15405 transcripts
+```
+
+2. Run gFACs to get the annotation statistics
+```
+[yimingweng@login6 gfacs]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/gfacs
+
+sbatch -J kely_final_model /blue/kawahara/yimingweng/universal_scripts/gfacs_statistics_no_genome.slurm \
+braker_2.1.2_gtf \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/prothint/kely_prohint_braker_final.gtf \
+kely_gfacs \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/gfacs
+```
 
 
+## **11/21/2022**
+**\# Go annotation**   
+Although the Go terms have been annotated by Interproscan, only about 1/4 of the genes were annotated. To increase the annotation rate, try blast2go (actually B2G4Pipe, the license free version) to annotate the gene model with more GO terms.
+
+1. get the ncbi XML blast result from diamond
+
+```
+[yimingweng@login5 go_annotation]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/go_annotation
 
 
+sbatch -J kely_nr_xml /blue/kawahara/yimingweng/universal_scripts/diamond_xml.slurm \
+/orange/kawahara/yimingweng/databases/nr.dmnd \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/prothint/kely_anysupport_aa.fa \
+0.00001 \
+kely_nr_k5_1e5_xml
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=%x_diamond_%j
+#SBATCH -o %x_diamond_%j.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=8gb
+#SBATCH -t 48:00:00
+#SBATCH -c 32
+#SBATCH --qos=kawahara
+
+module load diamond/2.0.9
+module load python3
+
+# example
+
+database=${1} # full path to the database in dmnd format, the diamond will use it to find the function for the querying gene model
+gene_model=${2} # gene model for functional annotation in fasta format
+cutoff=${3}
+outname=${4}
+path=$(echo ${database} | rev | cut -d "/" -f 2- | rev)
+database_name=$(echo ${database} | rev | cut -d "/" -f 1 | rev | cut -d "." -f 1)
+dmnd=$(ls ${path}/${database_name}.dmnd)
+
+if [ -z "${dmnd}" ]
+then
+  echo "converting database from fasta to dmnd format"
+  diamond makedb --in ${database} -d nr
+else
+  echo -e "the database has been converted to dmnd format, skip this step and run diamond"
+  diamond blastp -k 5 -e ${cutoff} -d ${database} -q ${gene_model} -f 5 -o ${outname}.tsv
+fi
+########################################################################
+```
+
+2. get the XML output result from InterProScan
+```
+[yimingweng@login5 go_annotation]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/go_annotation
+
+sbatch -J kely_interproscan /blue/kawahara/yimingweng/universal_scripts/interproscan.slurm \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/prothint/kely_anysupport_aa.fa \
+kely_interproscan_xml
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=%x_interproscan_%j
+#SBATCH -o %x_interproscan_%j.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=8gb
+#SBATCH -t 120:00:00
+#SBATCH -c 32
+
+module load iprscan/5.57
+
+protein=${1}
+prefix=${2}
+
+cat ${protein} | sed 's/\*//g' > ${prefix}.fasta
+interproscan.sh -i ${prefix}.fasta -cpu 32 -f XML -goterms
+########################################################################
+```
+
+## **11/23/2022**
+**\# KEGG annotation**
+**\# Go annotation** 
+**\# hmmer**   
+
+For some unknown reason the InterProScan did not work for the XML output version and the B2G4Pipe with Diamond XML output did not yield any result. I decided not to continue with B2G4Pipe and try other tools for GO annotation.
+
+1. I found that KEGG (Kyoto Encyclopedia of Genes and Genomes) terms (or KO terms) can serve similar function. So let's try annotate the protein sequence with KEGG.
+- visit [KAAS (KEGG Automatic Annotation Server)](https://www.genome.jp/kegg/kaas/) webpage.
+- select [KAAS job request for bi-directional best hit (BBH method)](https://www.genome.jp/kaas-bin/kaas_main)
+- upload protein sequence (kely_anysupport_aa.fa) and leave the setting default.
+- it took ~5 hour to finish the job and the notification will be sent to type-in email address.
+- The result for this species can be found in this [link](https://www.genome.jp/kaas-bin/kaas_main?mode=user&id=1669087103&key=2Xei_B70).
+- download the result of ko list to the local directory
+```
+[yimingweng@login1 kaas]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/go_annotation/kaas
+
+wget "https://www.genome.jp/tools/kaas/files/dl/1669087103/query.ko"
+mv query.ko kely_kaas_ko_list
+```
+- I also download the pathway list
 
 
+2. For Go term, I used PANNXER2 to get the GO annotation for my protein sequences.
+- visit [pannzer2 webpage](http://ekhidna2.biocenter.helsinki.fi/sanspanz/)
+- select Annotate tab
+- upload protein sequence (kely_anysupport_aa.fa) and leave the setting default
+- select Batch queue and type in email
+- it takes about 1 hour to finish the job (so save the link or keep the browser open), and the result for Keiferia is [here](http://ekhidna2.biocenter.helsinki.fi/barcosel/tmp//r7436iLdfEZ/index.html)
+- use `wget` to download all the outputs to `/blue/kawahara/yimingweng/Kely_genome_project/go_annotation/pennzer2`:
+    - Annotations (parseable)
+    - DE prediction details
+    - GO prediction details
+
+
+3. [hmmer](http://hmmer.org/) is another tool to annotate the gene model. 
+```
+[yimingweng@login6 hmmer]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/functional_annotation/hmmer
+
+sbatch -J kely /blue/kawahara/yimingweng/universal_scripts/hmmer.slurm \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/prothint/kely_anysupport_aa.fa \
+kely
+
+###########################  script content  ###########################
+#!/bin/bash
+
+#SBATCH --job-name=%x_hmmer_%j
+#SBATCH -o %x_hmmer_%j.log
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=yimingweng@ufl.edu
+#SBATCH --mem-per-cpu=4gb
+#SBATCH -t 120:00:00
+#SBATCH -c 32
+
+module load hmmer/3.2.1
+
+seqfile=${1}
+species=${2}
+
+hmmscan --tblout ${species}_hmmer /orange/kawahara/yimingweng/databases/Pfam-A.hmm ${seqfile} 
+########################################################################
+```
+
 
 <br />  
-<br /> 
-<br />  
-<br />  
-<br />  
-<br />  
-<br />  
-<br />  
-<br />  
-<br />  
-<br />  
-<br />  
+
 
 
 ### Path change/File moving notes
 - 10/28/2022: the file `nr.dmnd` was in `/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/diamond` before and now is in `/orange/kawahara/yimingweng/databases/`
 - 10/28/2022: the file `uniprot_arthropod.dmnd ` was in `/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/diamond` before and now is in `/orange/kawahara/yimingweng/databases/`
+- 11/16/2022: move all outputs of RepeatModeler from `/blue/kawahara/yimingweng/Kely_genome_project/annotation` to `/blue/kawahara/yimingweng/Kely_genome_project/annotation/RepeatModeler`
+- 11/16/2022: move all outputs of RepeatModeler and RepeatMasker from `/blue/kawahara/yimingweng/Kely_genome_project/annotation` to `/blue/kawahara/yimingweng/Kely_genome_project/annotation/repeat`
+- 11/16/2022: clean up files in `/blue/kawahara/yimingweng/Kely_genome_project/annotation`
