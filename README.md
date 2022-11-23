@@ -188,21 +188,45 @@ bash /blue/kawahara/yimingweng/universal_scripts/maskrate.sh kely_final_assembly
 -> hardmasking rate is 0%
 
 ### **Feature Annotation-2: gene model**
-To get the best gene model, it is better to have RNAseq data so that the splicing sites and the gene features can be better caught by the predictor. However, I don't have RNAseq read for Keiferia, so the suboptimal alternative is to predict the gene model based on the ab initio (signal sensors and content sensors) and the protein sequence data from other insect species. In this case, I used [braker2](https://github.com/Gaius-Augustus/BRAKER#braker-with-proteins-of-any-evolutionary-distance) to get the gene model. There are 5 steps to finish this pipeline, and I have merged them into one script called `braker_noRNA_anaotation2.slurm` in scripts folder.
+To get the best gene model, it is better to have RNAseq data so that the splicing sites and the gene features can be better caught by the predictor. However, I don't have RNAseq read for Keiferia, so the suboptimal alternative is to predict the gene model based on the ab initio (signal sensors and content sensors) and the protein sequence data from other insect species. 
+
+1. In this case, I used [braker2](https://github.com/Gaius-Augustus/BRAKER#braker-with-proteins-of-any-evolutionary-distance) to get the gene model. There are 6 steps to finish this pipeline, and I have merged them into one script called `braker_prothint.slurm` in scripts folder.
 - step1: download protein sequences from OrthoDB and take the repeat-masked genome as input, and run prohints to create protein database called prothint.gff
 - step2: run Braker2 with the prohints database
 - step3: use "selectSupportedSubsets.py" to extract the genes with full or partial support from the hints, and write it to a new gtf file called "supported_gene.gtf"
 - step4: use supported_gene.gtf to generate a new protein fasta file called "braker_supported_gene.aa"
 - step5: run busco without presence of isoform, further subset the braker_supported_gene.aa to a temporal fasta file (will be removed after the process finished) and this temporal fasta will be used to evaluate the completeness of the genome model with only the longest unique isoforms. That means the duplication from this busco result can not be referred to the presence of isoform.
+- step6: get the final gft (kely_prohint_braker_final.gtf) from the anysupport.gff by fetching the gene sets with the list of supported transcripts 
 ```
 [yimingweng@login6 kely_noRNA_model]$ pwd
-/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/kely_noRNA_model
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/prothint
 
-sbatch -J kely_noRNA_model2 braker_noRNA_anaotation2.slurm /blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_repeat_mask/kely_final_assembly_softmasked.fasta kely_rerun2
+sbatch -J kely_noRNA_model2 /blue/kawahara/yimingweng/universal_scripts/braker_prothint.slurm \
+/blue/kawahara/yimingweng/Kely_genome_project/assemblies/kely_repeat_mask/kely_final_assembly_softmasked.fasta \
+kely
 ```
 
-- the result of this pipelines are the fasta file containing all the predicted gene sequences and the corresponding gff files. Generally, the files with name containing *anysupport* are the final products. Here is the busco result for the final gene model (after removing the smaller isoform): 
-- result: **C:92.9%[S:91.5%,D:1.4%],F:0.8%,M:6.3%,n:5286**
+- the result of this pipelines are the fasta file containing all the predicted gene sequences and the corresponding gff files. Generally, the files with name containing *anysupport* are the final products. Here is the busco result for the final gene model (after removing the smaller isoform):
+    - Original BUSCO without removing unsupported gene (*not from this script*):   
+    **C:96.2%[S:85.9%,D:10.3%],F:0.8%,M:3.0%,n:5286**
+    - BUSCO result after removing the smaller isoforms:   
+    **C:93.2%[S:91.7%,D:1.5%],F:0.7%,M:6.1%,n:5286**
+    - The model comprises of **13841 genes** and **15405 transcripts**.
+
+
+2. Run gFACs to get the annotation statistics
+```
+[yimingweng@login6 gfacs]$ pwd
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/gfacs
+
+sbatch -J kely_final_model /blue/kawahara/yimingweng/universal_scripts/gfacs_statistics.slurm \
+braker_2.1.2_gtf \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/prothint/kely_prohint_braker_final.gtf \
+kely_gfacs \
+/blue/kawahara/yimingweng/Kely_genome_project/annotation/braker2/gfacs
+```
+
+
 
 ### **Functional Annotation**
 In this case, the gene model from the braker is called `kely_rerun2_anysupport_aa.fa`. I will blast those amino acid sequences in this file to different protein databases to get their predicted functions. For blasting job, I used [diamond](https://github.com/bbuchfink/diamond) to find the top 5 hits with the e-value cufoff to be 1e-5. The output file will be in the tsv format.
@@ -305,3 +329,5 @@ Philip Jones, David Binns, Hsin-Yu Chang, Matthew Fraser, Weizhong Li, Craig McA
 Törönen P, Medlar A, Holm L. PANNZER2: a rapid functional annotation web server. Nucleic Acids Res. 2018 Jul 2;46(W1):W84-W88. doi: 10.1093/nar/gky350. PMID: 29741643; PMCID: PMC6031051.
 
 Moriya, Y., Itoh, M., Okuda, S., Yoshizawa, A., and Kanehisa, M.; KAAS: an automatic genome annotation and pathway reconstruction server. Nucleic Acids Res. 35, W182-W185 (2007).
+
+Caballero M. and Wegrzyn J. 2019. gFACs: Gene Filtering, Analysis, and Conversion to Unify Genome Annotations Across Alignment and Gene Prediction Frameworks. Genomics_ Proteomics & Bioinformatics 17: 305-10
