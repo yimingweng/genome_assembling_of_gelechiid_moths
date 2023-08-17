@@ -1,6 +1,6 @@
-# Experiment note for Tuta absoluta genome assembly 
+# Experiment note for Phthorimaea absoluta genome assembly 
 ## 
-The note is to record the steps we did for assembling a genome for *Tuta absoluta*. We started from a relatively small hifi read data which has only ~2.2 million reads, covering about 9-11X of the genome, assuming the genome size is around 500-600Mbp. Although we have second sequence data coming later, it was even smaller, about 0.5 million reads so it didn't help improving the assembly. Because the main issue when assembling a genome with low coverage hifi long reads is the high duplication from the duplicated haplotigs, purging the assembly without losing the read contigs is the goal. So here this note we started from purging the genome assembly.
+The note is to record the steps we did for assembling a genome for *Phthorimaea absoluta*. We started from a relatively small hifi read data which has only ~2.2 million reads, covering about 9-11X of the genome, assuming the genome size is around 500-600Mbp. Although we have second sequence data coming later, it was even smaller, about 0.5 million reads so it didn't help improving the assembly. Because the main issue when assembling a genome with low coverage hifi long reads is the high duplication from the duplicated haplotigs, purging the assembly without losing the read contigs is the goal. So here this note we started from purging the genome assembly.
 
 ## **10/01/2022**
 I merged the two read sets, one is 9X and the other is 1-2X. I tried to get the assembly from the pooled reads. Once I got the assembly, I used haplotig purging pipeline to remove the duplicated contigs. Because multiple runs of this pipeline can potentially improve the result, I tried to run this pipeline 3 times.
@@ -9,8 +9,8 @@ I merged the two read sets, one is 9X and the other is 1-2X. I tried to get the 
 ###########################  script content  ###########################
 #!/bin/bash
 
-#SBATCH --job-name=tuta_merge_purge_step1
-#SBATCH -o tuta_merge_purge_step1.log
+#SBATCH --job-name=Phthorimaea_merge_purge_step1
+#SBATCH -o Phthorimaea_merge_purge_step1.log
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=yimingweng@ufl.edu
 #SBATCH --mem-per-cpu=8gb
@@ -22,14 +22,14 @@ module load samtools/1.15
 module load purge_haplotigs/1.1.2
 module load libssl/1.0.2l
 
-minimap2 -t 4 -ax map-pb /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/hifiasm_default/Tuta_merge_default.asm.fasta \
-/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/Tuta_merged.fastq.gz \
+minimap2 -t 4 -ax map-pb /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/hifiasm_default/Phthorimaea_merge_default.asm.fasta \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/Phthorimaea_merged.fastq.gz \
 --secondary=no \
 | samtools sort -m 1G -o aligned.bam -T tmp.ali
 
 purge_haplotigs  hist  \
--b /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/purge/aligned.bam  \
--g /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/hifiasm_default/Tuta_merge_default.asm.fasta
+-b /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/purge/aligned.bam  \
+-g /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/hifiasm_default/Phthorimaea_merge_default.asm.fasta
 ########################################################################
 ```
 
@@ -37,8 +37,8 @@ purge_haplotigs  hist  \
 ###########################  script content  ###########################
 #!/bin/bash
 
-#SBATCH --job-name=tuta_purge_cutoff
-#SBATCH -o tuta_purge_cutoff.log
+#SBATCH --job-name=Phthorimaea_purge_cutoff
+#SBATCH -o Phthorimaea_purge_cutoff.log
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=yimingweng@ufl.edu
 #SBATCH --mem-per-cpu=2gb
@@ -50,11 +50,11 @@ module load purge_haplotigs/1.1.2
 module load libssl/1.0.2l
 
 purge_haplotigs cov \
--i /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/purge/aligned.bam.gencov  \
+-i /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/purge/aligned.bam.gencov  \
 -l 2  \
 -m 33  \
 -h 20  \
--o tuta_coverage_stats.csv \
+-o Phthorimaea_coverage_stats.csv \
 -j 80 \
 -s 80
 ########################################################################
@@ -64,8 +64,8 @@ purge_haplotigs cov \
 ###########################  script content  ###########################
 #!/bin/bash
 
-#SBATCH --job-name=tuta_purge_haplotigs
-#SBATCH -o tuta_purge_haplotigs.log
+#SBATCH --job-name=Phthorimaea_purge_haplotigs
+#SBATCH -o Phthorimaea_purge_haplotigs.log
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=yimingweng@ufl.edu
 #SBATCH --mem-per-cpu=8gb
@@ -79,9 +79,9 @@ module load purge_haplotigs/1.1.2
 module load libssl/1.0.2l
 
 purge_haplotigs purge  \
--g /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/hifiasm_default/Tuta_merge_default.asm.fasta  \
--c /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/purge/tuta_coverage_stats.csv \
--o tuta_purge_2X_50X
+-g /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/hifiasm_default/Phthorimaea_merge_default.asm.fasta  \
+-c /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/purge/Phthorimaea_coverage_stats.csv \
+-o Phthorimaea_purge_2X_50X
 ########################################################################
 ```
 
@@ -92,8 +92,8 @@ purge_haplotigs purge  \
 ###########################  script content  ###########################
 #!/bin/bash
 
-#SBATCH --job-name=tuta_merge_purge_step1
-#SBATCH -o tuta_merge_purge_step1.log
+#SBATCH --job-name=Phthorimaea_merge_purge_step1
+#SBATCH -o Phthorimaea_merge_purge_step1.log
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=yimingweng@ufl.edu
 #SBATCH --mem-per-cpu=8gb
@@ -105,14 +105,14 @@ module load samtools/1.15
 module load purge_haplotigs/1.1.2
 module load libssl/1.0.2l
 
-minimap2 -t 4 -ax map-pb /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/purge/run2/tuta_purge_step2_2X_20X.fasta \
-/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/Tuta_merged.fastq.gz \
+minimap2 -t 4 -ax map-pb /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/purge/run2/Phthorimaea_purge_step2_2X_20X.fasta \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/Phthorimaea_merged.fastq.gz \
 --secondary=no \
 | samtools sort -m 1G -o aligned.bam -T tmp.ali
 
 purge_haplotigs  hist  \
--b /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/purge/run3/aligned.bam  \
--g /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/purge/run2/tuta_purge_step2_2X_20X.fasta
+-b /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/purge/run3/aligned.bam  \
+-g /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/purge/run2/Phthorimaea_purge_step2_2X_20X.fasta
 ########################################################################
 ```
 
@@ -121,8 +121,8 @@ purge_haplotigs  hist  \
 ###########################  script content  ###########################
 #!/bin/bash
 
-#SBATCH --job-name=tuta_purge_cutoff_run2
-#SBATCH -o tuta_purge_cutoff_run2.log
+#SBATCH --job-name=Phthorimaea_purge_cutoff_run2
+#SBATCH -o Phthorimaea_purge_cutoff_run2.log
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=yimingweng@ufl.edu
 #SBATCH --mem-per-cpu=2gb
@@ -135,18 +135,18 @@ module load purge_haplotigs/1.1.2
 module load libssl/1.0.2l
 
 purge_haplotigs cov \
--i /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/purge/run3/aligned.bam.gencov  \
+-i /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/purge/run3/aligned.bam.gencov  \
 -l 2  \
 -m 33  \
 -h 20  \
--o tuta_coverage_stats_run2.csv \
+-o Phthorimaea_coverage_stats_run2.csv \
 -j 80 \
 -s 80
 
 purge_haplotigs purge  \
--g /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/purge/run2/tuta_purge_step2_2X_20X.fasta  \
--c /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/purge/run3/tuta_coverage_stats_run3.csv \
--o tuta_purge_step2_2X_20X
+-g /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/purge/run2/Phthorimaea_purge_step2_2X_20X.fasta  \
+-c /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/purge/run3/Phthorimaea_coverage_stats_run3.csv \
+-o Phthorimaea_purge_step2_2X_20X
 ########################################################################
 ```
 3. third run
@@ -155,8 +155,8 @@ purge_haplotigs purge  \
 ###########################  script content  ###########################
 #!/bin/bash
 
-#SBATCH --job-name=tuta_merge_purge_step1
-#SBATCH -o tuta_merge_purge_step1.log
+#SBATCH --job-name=Phthorimaea_merge_purge_step1
+#SBATCH -o Phthorimaea_merge_purge_step1.log
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=yimingweng@ufl.edu
 #SBATCH --mem-per-cpu=8gb
@@ -168,14 +168,14 @@ module load samtools/1.15
 module load purge_haplotigs/1.1.2
 module load libssl/1.0.2l
 
-minimap2 -t 4 -ax map-pb /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/purge/tuta_purge_2X_20X.fasta \
-/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/Tuta_merged.fastq.gz \
+minimap2 -t 4 -ax map-pb /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/purge/Phthorimaea_purge_2X_20X.fasta \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/Phthorimaea_merged.fastq.gz \
 --secondary=no \
 | samtools sort -m 1G -o aligned.bam -T tmp.ali
 
 purge_haplotigs  hist  \
--b /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/purge/run2/aligned.bam  \
--g /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/purge/tuta_purge_2X_20X.fasta
+-b /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/purge/run2/aligned.bam  \
+-g /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/purge/Phthorimaea_purge_2X_20X.fasta
 ########################################################################
 ```
 
@@ -184,8 +184,8 @@ purge_haplotigs  hist  \
 ###########################  script content  ###########################
 #!/bin/bash
 
-#SBATCH --job-name=tuta_purge_cutoff_run3
-#SBATCH -o tuta_purge_cutoff_run3.log
+#SBATCH --job-name=Phthorimaea_purge_cutoff_run3
+#SBATCH -o Phthorimaea_purge_cutoff_run3.log
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=yimingweng@ufl.edu
 #SBATCH --mem-per-cpu=2gb
@@ -198,18 +198,18 @@ module load purge_haplotigs/1.1.2
 module load libssl/1.0.2l
 
 purge_haplotigs cov \
--i /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/purge/run3/aligned.bam.gencov  \
+-i /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/purge/run3/aligned.bam.gencov  \
 -l 2  \
 -m 33  \
 -h 20  \
--o tuta_coverage_stats_run3.csv \
+-o Phthorimaea_coverage_stats_run3.csv \
 -j 80 \
 -s 80
 
 purge_haplotigs purge  \
--g /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/purge/run2/tuta_purge_step2_2X_20X.fasta  \
--c /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge/purge/run3/tuta_coverage_stats_run3.csv \
--o tuta_purge_step2_2X_20X
+-g /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/purge/run2/Phthorimaea_purge_step2_2X_20X.fasta  \
+-c /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge/purge/run3/Phthorimaea_coverage_stats_run3.csv \
+-o Phthorimaea_purge_step2_2X_20X
 ########################################################################
 ```
 The assembly after 3 runs of the purging pipeline still contains high duplication rate, according to the busco single copy gene evaluation.
@@ -222,8 +222,8 @@ Now we should give up the pooled reads, and run purge pipeline for the old singl
 ###########################  script content  ###########################
 #!/bin/bash
 
-#SBATCH --job-name=tuta_purge_step1
-#SBATCH -o tuta_purge_step1.log
+#SBATCH --job-name=Phthorimaea_purge_step1
+#SBATCH -o Phthorimaea_purge_step1.log
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=yimingweng@ufl.edu
 #SBATCH --mem-per-cpu=8gb
@@ -235,14 +235,14 @@ module load samtools/1.15
 module load purge_haplotigs/1.1.2
 module load libssl/1.0.2l
 
-minimap2 -t 4 -ax map-pb /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_old_hifisam_reassemble/assembly1/Tuta_hifisam_reassemble_ctg.fasta \
-/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_old_hifisam_reassemble/assembly1/m64219e_220604_102704.hifi_reads.fastq.gz \
+minimap2 -t 4 -ax map-pb /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_old_hifisam_reassemble/assembly1/Phthorimaea_hifisam_reassemble_ctg.fasta \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_old_hifisam_reassemble/assembly1/m64219e_220604_102704.hifi_reads.fastq.gz \
 --secondary=no \
 | samtools sort -m 1G -o aligned.bam -T tmp.ali
 
 purge_haplotigs  hist  \
--b /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_old_hifisam_reassemble/purge/aligned.bam  \
--g /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_old_hifisam_reassemble/assembly1/Tuta_hifisam_reassemble_ctg.fasta
+-b /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_old_hifisam_reassemble/purge/aligned.bam  \
+-g /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_old_hifisam_reassemble/assembly1/Phthorimaea_hifisam_reassemble_ctg.fasta
 ########################################################################
 ```
 
@@ -250,8 +250,8 @@ purge_haplotigs  hist  \
 ###########################  script content  ###########################
 #!/bin/bash
 
-#SBATCH --job-name=tuta_original_purge_cutoff
-#SBATCH -o tuta_original_purge_cutoff.log
+#SBATCH --job-name=Phthorimaea_original_purge_cutoff
+#SBATCH -o Phthorimaea_original_purge_cutoff.log
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=yimingweng@ufl.edu
 #SBATCH --mem-per-cpu=2gb
@@ -264,25 +264,25 @@ module load purge_haplotigs/1.1.2
 module load libssl/1.0.2l
 
 purge_haplotigs cov \
--i /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_old_hifisam_reassemble/purge/aligned.bam.gencov  \
+-i /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_old_hifisam_reassemble/purge/aligned.bam.gencov  \
 -l 2  \
 -m 33  \
 -h 20  \
--o tuta_original_coverage_stats_run3.csv \
+-o Phthorimaea_original_coverage_stats_run3.csv \
 -j 80 \
 -s 80
 
 purge_haplotigs purge  \
--g /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_old_hifisam_reassemble/assembly1/Tuta_hifisam_reassemble_ctg.fasta  \
--c /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_old_hifisam_reassemble/purge/tuta_original_coverage_stats_run3.csv \
--o tuta_purge_step2_2X_20X
+-g /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_old_hifisam_reassemble/assembly1/Phthorimaea_hifisam_reassemble_ctg.fasta  \
+-c /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_old_hifisam_reassemble/purge/Phthorimaea_original_coverage_stats_run3.csv \
+-o Phthorimaea_purge_step2_2X_20X
 ########################################################################
 ```
 
 
 ## **10/19/2022**  
 Since it's been long time without updating the progress here, I'll just quickly summarize the recent findings here.
-1. The Tuta sequences from the 2 samples are neither good. The first sample has ~9-10X read coverage and the second one has only 1-2X coverage.
+1. The Phthorimaea sequences from the 2 samples are neither good. The first sample has ~9-10X read coverage and the second one has only 1-2X coverage.
 2. I've tried different combinations of assembling methods but non of them works perfectly. I will have to lower the standard a little bit and see what the best result I can get.
 <img src="https://drive.google.com/uc?export=view&id=19HOXfstmXAP083iLs_k8vkzdXNH9PeIG">
 
@@ -294,7 +294,7 @@ One thing I would like to try is to mapped the published short read data by [Tab
 1. download the read files
 ```
 [yimingweng@login2 run2_with_short_reads]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads
 
 sbatch  fastq_dump.slurm
 
@@ -317,14 +317,14 @@ fastq-dump --split-files --gzip  SRR8676205
 2. run bwa to map the reads to the genome
 ```
 [yimingweng@login2 run2_with_short_reads]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads
 
-sbatch tuta_bwa.slurm
+sbatch Phthorimaea_bwa.slurm
 
 ###########################  script content  ###########################
 #!/bin/bash
-#SBATCH --job-name=tuta_bwa
-#SBATCH --output=tuta_bwa.log
+#SBATCH --job-name=Phthorimaea_bwa
+#SBATCH --output=Phthorimaea_bwa.log
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=yimingweng@ufl.edu
 #SBATCH --ntasks=1
@@ -335,12 +335,12 @@ sbatch tuta_bwa.slurm
 module load bwa/0.7.17
 module loead samtools/1.15
 
-bwa index /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/T_absoluta_hifiasm_06_14_2022.asm.bp.p_ctg.fa
+bwa index /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/T_absoluta_hifiasm_06_14_2022.asm.bp.p_ctg.fa
 
-bwa mem -t 64 /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/T_absoluta_hifiasm_06_14_2022.asm.bp.p_ctg.fa /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads/SRR8676205_2.fastq.gz /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads/SRR8676205_3.fastq.gz > tuta_short_read_aln.sam
+bwa mem -t 64 /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/T_absoluta_hifiasm_06_14_2022.asm.bp.p_ctg.fa /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads/SRR8676205_2.fastq.gz /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads/SRR8676205_3.fastq.gz > Phthorimaea_short_read_aln.sam
 
-samtools view -S -b tuta_short_read_aln.sam > tuta_short_read_aln.bam
-samtools sort -m 1G -o tuta_short_read_aln.bam -T tmp.ali
+samtools view -S -b Phthorimaea_short_read_aln.sam > Phthorimaea_short_read_aln.bam
+samtools sort -m 1G -o Phthorimaea_short_read_aln.bam -T tmp.ali
 ########################################################################
 ```
 
@@ -350,15 +350,15 @@ samtools sort -m 1G -o tuta_short_read_aln.bam -T tmp.ali
 Once we have the mapped bam file, use it to run the haplotig purging again
 ```
 [yimingweng@login5 run2_with_short_reads]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads
 
-sbatch tuta_purge2_step2.slurm
+sbatch Phthorimaea_purge2_step2.slurm
 
 ###########################  script content  ###########################
 #!/bin/bash
 
-#SBATCH --job-name=tuta_purge2_step2
-#SBATCH -o tuta_purge2_step2.log
+#SBATCH --job-name=Phthorimaea_purge2_step2
+#SBATCH -o Phthorimaea_purge2_step2.log
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=yimingweng@ufl.edu
 #SBATCH --mem-per-cpu=8gb
@@ -369,8 +369,8 @@ module load purge_haplotigs/1.1.2
 module load libssl/1.0.2l
 
 purge_haplotigs  hist  \
--b /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads/tuta_short_read_aln_sorted.bam \
--g /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/tuta_purge.fasta
+-b /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads/Phthorimaea_short_read_aln_sorted.bam \
+-g /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/Phthorimaea_purge.fasta
 ########################################################################
 ```
 
@@ -378,8 +378,8 @@ purge_haplotigs  hist  \
 ###########################  script content  ###########################
 #!/bin/bash
 
-#SBATCH --job-name=tuta_original_purge_cutoff
-#SBATCH -o tuta_original_purge_cutoff.log
+#SBATCH --job-name=Phthorimaea_original_purge_cutoff
+#SBATCH -o Phthorimaea_original_purge_cutoff.log
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=yimingweng@ufl.edu
 #SBATCH --mem-per-cpu=2gb
@@ -392,18 +392,18 @@ module load purge_haplotigs/1.1.2
 module load libssl/1.0.2l
 
 purge_haplotigs cov \
--i /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads/tuta_short_read_aln_sorted.bam.gencov  \
+-i /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads/Phthorimaea_short_read_aln_sorted.bam.gencov  \
 -l 30  \
 -m 85  \
 -h 190  \
--o tuta_run2_stats.csv \
+-o Phthorimaea_run2_stats.csv \
 -j 95 \
 -s 95
 
 purge_haplotigs purge  \
--g /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/tuta_purge.fasta  \
--c /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads/tuta_run2_stats.csv \
--o tuta_purge_run2
+-g /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/Phthorimaea_purge.fasta  \
+-c /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads/Phthorimaea_run2_stats.csv \
+-o Phthorimaea_purge_run2
 ########################################################################
 Result: C:96.2%[S:82.5%,D:13.7%],F:0.5%,M:3.3%,n:5286
 ```
@@ -413,16 +413,16 @@ Result: C:96.2%[S:82.5%,D:13.7%],F:0.5%,M:3.3%,n:5286
 **\# best assembly model**  
 **\# blobplot**  
 
-By considering the BUSCO score, the best assembly I can get is to use the 9X genomic data, and run hifiasm with purging aggressiveness to be `-l 2`, and let the haplotig-purging pipeline to remove the duplications. So here is the final assembly for annotation:`/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads/tuta_purge_run2.fasta`
+By considering the BUSCO score, the best assembly I can get is to use the 9X genomic data, and run hifiasm with purging aggressiveness to be `-l 2`, and let the haplotig-purging pipeline to remove the duplications. So here is the final assembly for annotation:`/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads/Phthorimaea_purge_run2.fasta`
 
 1. Check the assembly statistics:
 ```
 [yimingweng@login5 purge]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge
 
 module load python3
 
-python /blue/kawahara/yimingweng/universal_scripts/assemblystats.py /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads/tuta_purge_run2.fasta
+python /blue/kawahara/yimingweng/universal_scripts/assemblystats.py /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads/Phthorimaea_purge_run2.fasta
 {
   "Contig Stats": {
     "L10": 12,
@@ -450,20 +450,20 @@ python /blue/kawahara/yimingweng/universal_scripts/assemblystats.py /blue/kawaha
     - run megablast to assign the best hit gene to the contig
 ```
 [yimingweng@login5 blobplot]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/blobplot
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/blobplot
 
-sbatch -J tuta_genome /blue/kawahara/yimingweng/universal_scripts/megablast_nt.slurm /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads/tuta_purge_run2.fasta tuta_genome
+sbatch -J Phthorimaea_genome /blue/kawahara/yimingweng/universal_scripts/megablast_nt.slurm /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads/Phthorimaea_purge_run2.fasta Phthorimaea_genome
 ```
 
-3. Store this "final version" of the assembly in `/blue/kawahara/yimingweng/Tuta_genome_project/assemblies` and name it as "**tuta_final_assembly.fasta**".
+3. Store this "final version" of the assembly in `/blue/kawahara/yimingweng/Phthorimaea_genome_project/assemblies` and name it as "**Phthorimaea_final_assembly.fasta**".
 ```
 yimingweng@login2 assemblies]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/assemblies
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/assemblies
 
-cp /blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_sho
-rt_reads/tuta_purge_run2.fasta  ./
+cp /blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_sho
+rt_reads/Phthorimaea_purge_run2.fasta  ./
 
-mv tuta_purge_run2.fasta tuta_final_assembly.fasta
+mv Phthorimaea_purge_run2.fasta Phthorimaea_final_assembly.fasta
 ```
 
 
@@ -475,23 +475,23 @@ tar zxf data/taxdump.tar.gz -C data/ nodes.dmp names.dmp
 . blobtools nodesdb --nodes data/nodes.dmp --names data/names.dmp
 
 
-sbatch -J tuta /blue/kawahara/yimingweng/universal_scripts/minimap.slurm \
-/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads/tuta_purge_run2.fasta \
-/blue/kawahara/shashankp/tutaabsoluta_NS2707/Tuta_fastqc/m64219e_220604_102704.hifi_reads.fasta.gz \
-tuta_blobplot
+sbatch -J Phthorimaea /blue/kawahara/yimingweng/universal_scripts/minimap.slurm \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads/Phthorimaea_purge_run2.fasta \
+/blue/kawahara/shashankp/Phthorimaeaabsoluta_NS2707/Phthorimaea_fastqc/m64219e_220604_102704.hifi_reads.fasta.gz \
+Phthorimaea_blobplot
 
 
-sbatch -J tuta /blue/kawahara/yimingweng/universal_scripts/blobplot.slurm \
-/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads/tuta_purge_run2.fasta \
-/blue/kawahara/yimingweng/Tuta_genome_project/blobplot/tuta_blobplot.bam \
-/blue/kawahara/yimingweng/Tuta_genome_project/blobplot/tuta_genome.nt.mts1.hsp1.1e25.megablast.out \
-tuta_blobplot
+sbatch -J Phthorimaea /blue/kawahara/yimingweng/universal_scripts/blobplot.slurm \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads/Phthorimaea_purge_run2.fasta \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/blobplot/Phthorimaea_blobplot.bam \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/blobplot/Phthorimaea_genome.nt.mts1.hsp1.1e25.megablast.out \
+Phthorimaea_blobplot
 
-sbatch -J tuta /blue/kawahara/yimingweng/universal_scripts/repeatmodeler2.slurm \
-/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads/tuta_purge_run2.fasta \
-tuta_repeat
+sbatch -J Phthorimaea /blue/kawahara/yimingweng/universal_scripts/repeatmodeler2.slurm \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads/Phthorimaea_purge_run2.fasta \
+Phthorimaea_repeat
 ```
-<img src="https://github.com/yimingweng/Tuta_genome_project/blob/main/blobplot_results/tuta_blobplot.png">
+<img src="https://github.com/yimingweng/Phthorimaea_genome_project/blob/main/blobplot_results/Phthorimaea_blobplot.png">
 
 
 ## **11/07/2022** 
@@ -502,19 +502,19 @@ tuta_repeat
 1. run Repeatmodeler
 ```
 [yimingweng@login2 repeatmodeler]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/repeatmodeler
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/repeatmodeler
 
-sbatch -J tuta /blue/kawahara/yimingweng/universal_scripts/repeatmodeler2.slurm /blue/kawahara/yimingweng/Tuta_genome_project/assemblies/tuta_final_assembly.fasta tuta_repeat
+sbatch -J Phthorimaea /blue/kawahara/yimingweng/universal_scripts/repeatmodeler2.slurm /blue/kawahara/yimingweng/Phthorimaea_genome_project/assemblies/Phthorimaea_final_assembly.fasta Phthorimaea_repeat
 ```
 
 2. run repeatmasker
 ```
 [yimingweng@login2 repeatmasker]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/repeatmasker
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/repeatmasker
 
-sbatch -J tuta /blue/kawahara/yimingweng/universal_scripts/repeatmakser.slurm /blue/kawahara/yimingweng/Tuta_genome_project/assemblies/tuta_final_assembly.fasta \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/repeatmodeler/tuta_repeat-families.fa \
-tuta_repeatmasker
+sbatch -J Phthorimaea /blue/kawahara/yimingweng/universal_scripts/repeatmakser.slurm /blue/kawahara/yimingweng/Phthorimaea_genome_project/assemblies/Phthorimaea_final_assembly.fasta \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/repeatmodeler/Phthorimaea_repeat-families.fa \
+Phthorimaea_repeatmasker
 
 ###########################  script content  ###########################
 #!/bin/bash
@@ -575,10 +575,10 @@ ${path}/${prefix}/${name}.masked.masked &> ./${prefix}/${prefix}_step3.out
 ```
 3. check the masing rate
 ```
-[yimingweng@login6 tuta_repeatmasker]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/repeatmasker/tuta_repeatmasker
+[yimingweng@login6 Phthorimaea_repeatmasker]$ pwd
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/repeatmasker/Phthorimaea_repeatmasker
 
-bash /blue/kawahara/yimingweng/universal_scripts/maskrate.sh tuta_final_assembly.fasta.masked.masked.masked
+bash /blue/kawahara/yimingweng/universal_scripts/maskrate.sh Phthorimaea_final_assembly.fasta.masked.masked.masked
 softmasking rate is 54.40%
 hardmasking rate is 0%
 ```
@@ -591,24 +591,24 @@ hardmasking rate is 0%
 1. run braker2 with the protein database from orthoDB. The prothint data will be used to train the gene model 
 ```
 [yimingweng@login6 prothint]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/prothint
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/prothint
 
-sbatch -J tuta /blue/kawahara/yimingweng/universal_scripts/braker_prothint.slurm \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/repeatmasker/tuta_repeatmasker/tuta_final_assembly.fasta.masked.masked.masked \
-tuta_prothint
+sbatch -J Phthorimaea /blue/kawahara/yimingweng/universal_scripts/braker_prothint.slurm \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/repeatmasker/Phthorimaea_repeatmasker/Phthorimaea_final_assembly.fasta.masked.masked.masked \
+Phthorimaea_prothint
 ```
 
 2. run braker2 with the RNAseq data. The reads were download from NCBI originally published by [Camargo et al, 2015](https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-015-1841-5). There are 6 different life stages, and one got single end reads and the rest got paired end reads. 
 - download the reads
 ```
 [yimingweng@login2 raw_reads]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/RNAseq/raw_reads
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/RNAseq/raw_reads
 
 sbatch SRR_download.slurm
 ```
 - clean up the reads using [trimmomatic](http://www.usadellab.org/cms/?page=trimmomatic)
 ```
-sbatch -J tuta_trimmomatic trimmomatic.slurm /blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/RNAseq/raw_reads/ /blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/RNAseq/trimmed_reads/
+sbatch -J Phthorimaea_trimmomatic trimmomatic.slurm /blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/RNAseq/raw_reads/ /blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/RNAseq/trimmed_reads/
 
 ###########################  script content  ###########################
 #!/bin/bash
@@ -663,12 +663,12 @@ rm *tmp
 
 ```
 [yimingweng@login2 bam_files]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/RNAseq/bam_files
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/RNAseq/bam_files
 
-sbatch -J tuta /blue/kawahara/yimingweng/universal_scripts/hisat.slurm \
-/blue/kawahara/yimingweng/Tuta_genome_project/assemblies/tuta_final_assembly.fasta \
-tuta_absoulata \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/RNAseq/trimmed_reads
+sbatch -J Phthorimaea /blue/kawahara/yimingweng/universal_scripts/hisat.slurm \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/assemblies/Phthorimaea_final_assembly.fasta \
+Phthorimaea_absoulata \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/RNAseq/trimmed_reads
 
 ###########################  script content  ###########################
 #!/bin/bash
@@ -724,7 +724,7 @@ rm *junctions
 - check the mapping rate for those reads
 ```
 [yimingweng@login2 bam_files]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/RNAseq/bam_files
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/RNAseq/bam_files
 
 for sam in $(ls SRR* | cut -d "_" -f 1 | sort | uniq)
 do
@@ -749,7 +749,7 @@ SRR2147324   | 22261676 | 17878864 | 0.803  | 4382812  | 0.197 |
 - convert the sam files to bam
 ```
 [yimingweng@login2 bam_files]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/RNAseq/bam_files
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/RNAseq/bam_files
 
 sbatch -J sam2bam sam2bam.slurm
 
@@ -778,15 +778,15 @@ done
 - check the RNA read coverage, the coverage should be sufficient to cover the intros so that the braker can use it to train GeneMark-ET and to predict the gene model with the spliced alignment information in Augustus.
 ```
 [yimingweng@login5 bam_files]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/RNAseq/bam_files
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/RNAseq/bam_files
 
 sbatch depth.slurm
 
 ###########################  script content  ###########################
 #!/bin/bash
 
-#SBATCH --job-name=tuta_merge_purge_step1
-#SBATCH -o tuta_merge_purge_step1.log
+#SBATCH --job-name=Phthorimaea_merge_purge_step1
+#SBATCH -o Phthorimaea_merge_purge_step1.log
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=yimingweng@ufl.edu
 #SBATCH --mem-per-cpu=8gb
@@ -811,12 +811,12 @@ Average =  3.22731 (SRR2147324)
 - remove redundant fastq, sam and bam files (just keep the sorted bam files), and run braker with the sorted bam files
 ```
 [yimingweng@login2 RNAseq]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/RNAseq
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/RNAseq
 
-sbatch -J tuta /blue/kawahara/yimingweng/universal_scripts/braker2_RNA.slurm \
-/blue/kawahara/yimingweng/Tuta_genome_project/assemblies/tuta_final_assembly.fasta \
-tuta_absoluta \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/RNAseq/bamlist
+sbatch -J Phthorimaea /blue/kawahara/yimingweng/universal_scripts/braker2_RNA.slurm \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/assemblies/Phthorimaea_final_assembly.fasta \
+Phthorimaea_absoluta \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/RNAseq/bamlist
 
 ###########################  script content  ###########################
 #!/bin/bash
@@ -848,16 +848,16 @@ braker.pl \
 - Use [TSEBRA](https://github.com/Gaius-Augustus/TSEBRA) to combine the gene models from prothint and RNAseq models.
 ```
 [yimingweng@login2 tsebra]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/tsebra
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/tsebra
 
-sbatch -J tuta /blue/kawahara/yimingweng/universal_scripts/tsebra.slurm \
-/blue/kawahara/yimingweng/Tuta_genome_project/assemblies/tuta_final_assembly.fasta \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/prothint/braker/braker.gtf \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/RNAseq/braker/braker.gtf \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/tsebra/tuta_tsebra_default.cgf \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/prothint/braker/hintsfile.gff \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/RNAseq/braker/hintsfile.gff \
-tuta_tsebra_default
+sbatch -J Phthorimaea /blue/kawahara/yimingweng/universal_scripts/tsebra.slurm \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/assemblies/Phthorimaea_final_assembly.fasta \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/prothint/braker/braker.gtf \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/RNAseq/braker/braker.gtf \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/tsebra/Phthorimaea_tsebra_default.cgf \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/prothint/braker/hintsfile.gff \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/RNAseq/braker/hintsfile.gff \
+Phthorimaea_tsebra_default
 
 ###########################  script content  ###########################
 #!/bin/bash
@@ -898,15 +898,15 @@ ${outprefix}.aa
 - check the number of transcript and busco results in the combined model
 ```
 [yimingweng@login2 tsebra]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/tsebra
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/tsebra
 
 # check the number of transcript
-cat tuta_tsebra_default.aa | grep ">" | wc -l
+cat Phthorimaea_tsebra_default.aa | grep ">" | wc -l
 # 48412
 
 # run busco on the combined gene model
-sbatch -J tuta /blue/kawahara/yimingweng/universal_scripts/busco_gene_model.slurm \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/tsebra/tuta_tsebra_default.aa
+sbatch -J Phthorimaea /blue/kawahara/yimingweng/universal_scripts/busco_gene_model.slurm \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/tsebra/Phthorimaea_tsebra_default.aa
 
 ### Results: C:93.9%[S:75.8%,D:18.1%],F:1.5%,M:4.6%,n:5286
 ```
@@ -914,14 +914,14 @@ sbatch -J tuta /blue/kawahara/yimingweng/universal_scripts/busco_gene_model.slur
 - remove the transcripts without hints support, and redeem the non-supported genes with blast hits
 ```
 [yimingweng@login2 tsebra]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/tsebra
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/tsebra
 
 # trim the transcript with no hint support
-sbatch -J tuta findsupport.slurm \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/tsebra/tuta_tsebra_default.gtf \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/prothint/braker/hintsfile.gff \
-/blue/kawahara/yimingweng/Tuta_genome_project/assemblies/tuta_final_assembly.fasta \
-tuta_absoluta
+sbatch -J Phthorimaea findsupport.slurm \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/tsebra/Phthorimaea_tsebra_default.gtf \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/prothint/braker/hintsfile.gff \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/assemblies/Phthorimaea_final_assembly.fasta \
+Phthorimaea_absoluta
 
 ###########################  script content  ###########################
 #!/bin/bash
@@ -990,18 +990,18 @@ rm ${species}_tmp.fasta ${species}_nosupport.aa
 
 1. Although the model generated from this pipeline looks good in BUSCO (consider the original assembly has 13% duplication rate), the gene number is still way too high. I found that this inflating model is common in braker2 with RNA sequence training model. After trying many different filtering processes including [gFACs](https://gfacs.readthedocs.io/en/latest/), the best model based on gene number and BUSCO is from this pipeline:
 
-<img src="https://github.com/yimingweng/Tuta_genome_project/blob/main/annotation/tuta_gene_model_pipeline.jpg">
+<img src="https://github.com/yimingweng/Phthorimaea_genome_project/blob/main/annotation/Phthorimaea_gene_model_pipeline.jpg">
 
 And here this the script combining the filtering and transcribe selection (TSEBRA) steps:
 ```
 [yimingweng@login6 braker2]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/tsebra2
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/tsebra2
 
-sbatch -J tuta findsupport_tsebra.slurm \
-/blue/kawahara/yimingweng/Tuta_genome_project/assemblies/tuta_final_assembly.fasta \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/RNAseq \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/prothint \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/tsebra2/tuta_tsebra_default.cgf
+sbatch -J Phthorimaea findsupport_tsebra.slurm \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/assemblies/Phthorimaea_final_assembly.fasta \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/RNAseq \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/prothint \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/tsebra2/Phthorimaea_tsebra_default.cgf
 
 ###########################  script content  ###########################
 #!/bin/bash
@@ -1059,18 +1059,18 @@ BUSCO for single isoform: C:93.1%[S:76.7%,D:16.4%],F:1.3%,M:5.6%,n:5286
 BUSCO for all isoforms: C:93.2%[S:75.9%,D:17.3%],F:1.3%,M:5.5%,n:5286
 ```
 
-2. With the final model settled down. I would like to look closer to the model and some of the statistics can be used to compared with models from other gelechiid species (Keferia and Tuta, for example). Here I employed [gFACs](https://gfacs.readthedocs.io/en/latest/) again, but not foe the model trimming but for accessing the statistics of the model.
+2. With the final model settled down. I would like to look closer to the model and some of the statistics can be used to compared with models from other gelechiid species (Keferia and Phthorimaea, for example). Here I employed [gFACs](https://gfacs.readthedocs.io/en/latest/) again, but not foe the model trimming but for accessing the statistics of the model.
 
 ```
 [yimingweng@login6 gfacs]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/gfacs
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/gfacs
 
-sbatch -J tuta_final_model /blue/kawahara/yimingweng/universal_scripts/gfacs_statistics.slurm \
+sbatch -J Phthorimaea_final_model /blue/kawahara/yimingweng/universal_scripts/gfacs_statistics.slurm \
 braker_2.1.2_gtf \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/tsebra/tuta_tsebra_default.gtf \
-/blue/kawahara/yimingweng/Tuta_genome_project/assemblies/tuta_final_assembly.fasta \
-tuta_tesbra_gfacs \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/gfacs
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/tsebra/Phthorimaea_tsebra_default.gtf \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/assemblies/Phthorimaea_final_assembly.fasta \
+Phthorimaea_tesbra_gfacs \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/gfacs
 
 ###########################  script content  ###########################
 #!/bin/bash
@@ -1121,22 +1121,22 @@ ${model}
 
 ```
 [yimingweng@login5 interporscan]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/interporscan
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/interporscan
 
-sbatch -J tuta_interproscan /blue/kawahara/yimingweng/universal_scripts/interproscan.slurm \
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/tsebra/tuta_tsebra_default.aa \
-tuta_interproscan
+sbatch -J Phthorimaea_interproscan /blue/kawahara/yimingweng/universal_scripts/interproscan.slurm \
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/tsebra/Phthorimaea_tsebra_default.aa \
+Phthorimaea_interproscan
 ```
 
 ## **11/27/2022** 
 **\# diamond** 
 ```
 [yimingweng@login6 diamond]$ pwd
-/blue/kawahara/yimingweng/Tuta_genome_project/annotation/diamond
+/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/diamond
 
-sbatch -J tuta_nr /blue/kawahara/yimingweng/universal_scripts/diamond.slurm /orange/kawahara/yimingweng/databases/nr.dmnd /blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/tsebra/tuta_tsebra_default.aa 0.00001 tuta_nr_k5_1e5
+sbatch -J Phthorimaea_nr /blue/kawahara/yimingweng/universal_scripts/diamond.slurm /orange/kawahara/yimingweng/databases/nr.dmnd /blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/tsebra/Phthorimaea_tsebra_default.aa 0.00001 Phthorimaea_nr_k5_1e5
 
-sbatch -J tuta_uniprot /blue/kawahara/yimingweng/universal_scripts/diamond.slurm /orange/kawahara/yimingweng/databases/uniprot_arthropod.dmnd /blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/tsebra/tuta_tsebra_default.aa 0.00001 tuta_uniprot_k5_1e5
+sbatch -J Phthorimaea_uniprot /blue/kawahara/yimingweng/universal_scripts/diamond.slurm /orange/kawahara/yimingweng/databases/uniprot_arthropod.dmnd /blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/tsebra/Phthorimaea_tsebra_default.aa 0.00001 Phthorimaea_uniprot_k5_1e5
 ```
 
 ## 
@@ -1156,11 +1156,11 @@ sbatch -J tuta_uniprot /blue/kawahara/yimingweng/universal_scripts/diamond.slurm
 
 
 ### **Path change/File moving notes**
-- 11/02/2022: remove directory `/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_merge`
-- 11/02/2022: rename directory `/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_new_seq/` to be `~/Tuta_second_sequence/`
-- 11/02/2022: remove directory `/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_second_sequence/genome_size`
-- 11/02/2022: remove directory `/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_old_hifisam_reassemble`
-- 11/02/2022: remove directory `/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads/*fastq.gz`
-- 11/02/2022: remove directory `/blue/kawahara/yimingweng/Tuta_genome_project/Tuta_first_assembly/purge/run2_with_short_reads/tuta*.bam`
-- 11/08/2022: remove files `/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/RNAseq/raw_reads/*.fastq.gz`
-- 11/08/2022: remove files `/blue/kawahara/yimingweng/Tuta_genome_project/annotation/braker2/RNAseq/bam_files/*sam*`
+- 11/02/2022: remove directory `/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_merge`
+- 11/02/2022: rename directory `/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_new_seq/` to be `~/Phthorimaea_second_sequence/`
+- 11/02/2022: remove directory `/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_second_sequence/genome_size`
+- 11/02/2022: remove directory `/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_old_hifisam_reassemble`
+- 11/02/2022: remove directory `/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads/*fastq.gz`
+- 11/02/2022: remove directory `/blue/kawahara/yimingweng/Phthorimaea_genome_project/Phthorimaea_first_assembly/purge/run2_with_short_reads/Phthorimaea*.bam`
+- 11/08/2022: remove files `/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/RNAseq/raw_reads/*.fastq.gz`
+- 11/08/2022: remove files `/blue/kawahara/yimingweng/Phthorimaea_genome_project/annotation/braker2/RNAseq/bam_files/*sam*`
