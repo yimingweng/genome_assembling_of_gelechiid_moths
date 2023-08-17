@@ -1,5 +1,5 @@
 # Kely genome project
-The genome assembly project for the Tomato Pinworm, *Keiferia lycopersicella* (Walsingham)
+The genome assembly project for the Tomato Pinworm, *Keiferia lycopersicella* (Walsingham), *Phthorimaea absoluta* (*Tuta absoluta*, tomato leafminer), and *Scrobipalpa atriplicella* (goosefoot groundling moth).
 
 ## Background
 - The tomato pinworm is a small moth feeds on mostly tomatoes and sometimes eggplant. The damage is mainly on the leaf through the leaf-mining feeding habit.
@@ -7,11 +7,12 @@ The genome assembly project for the Tomato Pinworm, *Keiferia lycopersicella* (W
 - The host range of tomato pinworm is mainly on Solanaceae especially the tomato, but the attacks to other species like egg plant and some weed species in the family are documented.
 - A comprehensive document about this species can be found in the [Featured Creatures website](https://entnemdept.ufl.edu/creatures/veg/tomato/tomato_pinworm.htm) published by University of Florida.
 - It would be interesting to have a genome assembled, annotated, and published for this species, as it could provide a promising scientific value to understand the pest ecology/evolution and potentially the genes involved in the host plant selection.
+- To compare the genome with other gelechiid moth, we also sequenced and assembled the other two species: *Phthorimaea absoluta* and *Scrobipalpa atriplicella*.
 
 <br />
 
 ## General Workflows
-This section describes the steps we take for a general genome assembling pipeline from raw reads to a well-annotated genome or even some further analyses.
+This section describes the steps we used for a general genome assembling pipeline from raw reads to a well-annotated genomes. The description is mainly for *Keiferia lycopersicella*, but also work for the other two species. Except for the purging step of *Phthorimaea absoluta*. Details of those small modifications please see the note files.
 <br />
 
 ### **Read Quality Assessment**

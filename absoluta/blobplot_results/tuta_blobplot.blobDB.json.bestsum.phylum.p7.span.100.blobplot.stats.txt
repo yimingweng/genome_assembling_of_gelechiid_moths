@@ -1,0 +1,6 @@
+## blobtools v1.0
+## bam0=/blue/kawahara/yimingweng/Tuta_genome_project/blobplot/tuta_blobplot.bam
+# name	colour	count_visible	count_visible_perc	span_visible	span_visible_perc	n50	gc_mean	gc_std	bam0_mean	bam0_std	bam0_read_map	bam0_read_map_p
+all	None	688	100.0%	652,703,157	100.0%	1,614,219	0.39	0.017	16.1	33.0	3,279,663	99.8%
+Arthropoda	#9e0142	687	100.0%	652,693,414	100.0%	1,614,219	0.39	0.017	16.1	33.0	3,279,577	99.8%
+no-hit	#d3d3d3	1	100.0%	9,743	100.0%	9,743	0.37	0.0	22.3	0.0	86	0.0%
