@@ -31,11 +31,11 @@ The estimations of genome size and sequence coverage (read depth) usually come t
 [yimingweng@login2 genome_size]$ pwd
 /blue/kawahara/yimingweng/Kely_genome_project/genome_size
 
-sbatch -J kely fastq_KMC.slurm /blue/kawahara/yimingweng/Kely_genome_project/raw_reads/Keiferia_lycopersicella_ccs.fastq.gz Kely 21
+sbatch -J kely fastq_KMC.slurm /blue/kawahara/yimingweng/Kely_genome_project/raw_reads/Keiferia_lycopersicella_ccs.fastq.gz Kely 31
 ```
-2. Use [GenomeScope2](http://qb.cshl.edu/genomescope/genomescope2.0/) (online tool) to visualize the kmer distribution and get the estimates of genome size and sequence coverage. The parameters were kept default with kmer size to be 21. The result can be viewed [here](http://qb.cshl.edu/genomescope/genomescope2.0/analysis.php?code=mYfpkD8wYxxcIy48XpO0); and the distribution is shown below:
+2. Use [GenomeScope2](http://qb.cshl.edu/genomescope/genomescope2.0/) (online tool) to visualize the kmer distribution and get the estimates of genome size and sequence coverage. The parameters were kept default with kmer size to be ˇ1. The distribution is shown below:
 
-<img src="http://qb.cshl.edu/genomescope/genomescope2.0/user_data/mYfpkD8wYxxcIy48XpO0/linear_plot.png?raw=true">
+<img src="https://github.com/yimingweng/genome_assembling_of_gelechiid_moths/blob/main/kmer_plots/Klyc31.png?raw=true?">
 
 
 - The estimated genome size is about 302 Mbp, since there are peak at 100X, we know there are repeats in the genome and the genome size 302Mbp is probably underestimated.
